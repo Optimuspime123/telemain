@@ -66,7 +66,6 @@ socksio==1.0.0
 spotipy==2.23.0
 Telethon==1.35.0
 tenacity==8.2.2
-tiktoken==0.5.1
 tls-client==1.0.1
 tqdm==4.66.4
 typing_extensions==4.11.0
