@@ -2,6 +2,7 @@ import os
 os.system("pip uninstall telegram")
 os.system("pip install python-telegram-bot==13.2")
 import re
+import urllib3
 import telegram
 from telegram import ChatAction, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
