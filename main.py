@@ -17,7 +17,7 @@ from telegram.ext import (
     Updater,
 )
 
-BOT_TOKEN = "6916506986:AAG6oz3eGfUqq_RXOawvJ1zDmyKp-Fi12Ag"  #testpyoptibot
+BOT_TOKEN = "7021728236:AAG3W70TpLQx-JO2Tu4DC4g2LosfoLNNlxA"  #notestbot
 
 client = OpenAI(api_key="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")
 updater = Updater(token=BOT_TOKEN, use_context=True)
