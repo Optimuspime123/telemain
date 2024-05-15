@@ -74,15 +74,15 @@ def filter_response(response):
         filtered_response['webPages'] = {'value': []}
         for page in response['webPages']['value']:
             filtered_page = {
-                'name': page['name'],
-                'url': page['url'],
-                'snippet': page['snippet']
+                'name': page.get('name', ''),
+                'url': page.get('url', ''),
+                'snippet': page.get('snippet', '')
             }
             # Keep only relevant fields
             if 'displayUrl' in page:
-                filtered_page['displayUrl'] = page['displayUrl']
+                filtered_page['displayUrl'] = page.get('displayUrl', '')
             if 'dateLastCrawled' in page:
-                filtered_page['dateLastCrawled'] = page['dateLastCrawled']
+                filtered_page['dateLastCrawled'] = page.get('dateLastCrawled', '')
             filtered_response['webPages']['value'].append(filtered_page)
 
     # Filter for relevant news
@@ -90,16 +90,16 @@ def filter_response(response):
         filtered_response['news'] = {'value': []}
         for article in response['news']['value']:
             filtered_article = {
-                'name': article['name'],
-                'url': article['url'],
-                'description': article['description'],
-                'datePublished': article['datePublished']
+                'name': article.get('name', ''),
+                'url': article.get('url', ''),
+                'description': article.get('description', ''),
+                'datePublished': article.get('datePublished', '')
             }
             # Keep only relevant fields
             if 'provider' in article:
-                filtered_article['provider'] = article['provider']
+                filtered_article['provider'] = article.get('provider', '')
             if 'category' in article:
-                filtered_article['category'] = article['category']
+                filtered_article['category'] = article.get('category', '')
             filtered_response['news']['value'].append(filtered_article)
 
     # Filter for relevant videos
@@ -107,16 +107,16 @@ def filter_response(response):
         filtered_response['videos'] = {'value': []}
         for video in response['videos']['value']:
             filtered_video = {
-                'name': video['name'],
-                'description': video['description'],
-                'url': video['contentUrl'],
-                'datePublished': video['datePublished'],
-                'publisher': video['publisher']
+                'name': video.get('name', ''),
+                'description': video.get('description', ''),
+                'url': video.get('contentUrl', ''),
+                'datePublished': video.get('datePublished', ''),
+                'publisher': video.get('publisher', '')
             }
             filtered_response['videos']['value'].append(filtered_video)
 
     return filtered_response
-
+    
 def search(query):
     # Construct a request
     mkt = 'en-US'
