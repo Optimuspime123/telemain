@@ -270,7 +270,7 @@ def respond_to_message(update, context):
                                          action=ChatAction.TYPING)
 
             json_results = search(query)
-            system_message = f"The user requested a web search, here are the results: {json_results}. You are advised to use them in your response if relevant. "
+            system_message = f"The user requested a web search, here are the results: {json_results}. You are advised to use them in your response and cite sources if relevant . "
             context.user_data["messages"].append({
                 "role": "system",
                 "content": system_message
