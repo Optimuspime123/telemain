@@ -6,6 +6,7 @@ import re
 import time
 import urllib3
 import requests
+import json
 import telegram
 from openai import OpenAI
 from telegram import ChatAction, InlineKeyboardButton, InlineKeyboardMarkup
@@ -33,7 +34,7 @@ def encode_image(image_path):
 def start(update, context):
     """Sends welcome message and image on /start command."""
     user = update.effective_user
-    welcome_message = f"👋 Hi {user.first_name}, welcome to Cogify, an advanced AI-bot powered by GPT-4o and DALL·E 3! 🤖✨\n \n 💬 Send me a message to get started! I'm happy to chat, answer questions, help with analysis and writing tasks, and more.\n \n 🖼️ Type '/img [your prompt]' to generate images using DALL·E 3. For example: /img a majestic lion on the African savanna at sunset, digital art \n \n 🏞️ Send any image and I'll use GPT-4 with computer vision to analyze and discuss it with you.\n \n 🧹 If you ever want to clear our conversation history and start fresh, just type '/clear' \n\n Use /settings to change bot settings. \n\n ℹ️ Learn more about what I can do at https://cogify.social \n "
+    welcome_message = f"👋 Hi {user.first_name}, welcome to Cogify, an advanced AI-bot powered by GPT-4o and DALL·E 3! 🤖✨\n \n 💬 Send me a message to get started! I'm happy to chat, answer questions, help with analysis and writing tasks, and more.\n \n 🖼️ Type '/img [your prompt]' to generate images using DALL·E 3. For example: /img a majestic lion on the African savanna at sunset, digital art \n \n 🏞️ Send any image and I'll use GPT-4 with computer vision to analyze and discuss it with you.\n \n 🧹 If you ever want to clear our conversation history and start fresh, just type '/clear' \n\n Start a prompt with /web to give GPT-4 access to information from the web! (works best with gpt-4-turbo) \n\n Use /settings to change bot settings. \n\n ℹ️ Learn more about what I can do at https://cogify.social \n "
 
     try:
         context.bot.send_chat_action(chat_id=update.effective_chat.id,
@@ -55,6 +56,99 @@ def start(update, context):
         photo="https://graph.org/file/fd41b5e034a27cc4d65b6.jpg",
         caption=welcome_message,
         reply_to_message_id=update.message.message_id)
+
+
+def filter_response(response):
+    filtered_response = {}
+
+    # Filter for timezone information
+    if 'timeZone' in response:
+        filtered_response['timeZone'] = {}
+        if 'primaryCityTime' in response['timeZone']:
+            filtered_response['timeZone']['primaryCityTime'] = {
+                key: value for key, value in response['timeZone']['primaryCityTime'].items() if key != 'utcOffset'
+            }
+
+    # Filter for relevant web pages
+    if 'webPages' in response and 'value' in response['webPages']:
+        filtered_response['webPages'] = {'value': []}
+        for page in response['webPages']['value']:
+            filtered_page = {
+                'name': page['name'],
+                'url': page['url'],
+                'snippet': page['snippet']
+            }
+            # Keep only relevant fields
+            if 'displayUrl' in page:
+                filtered_page['displayUrl'] = page['displayUrl']
+            if 'dateLastCrawled' in page:
+                filtered_page['dateLastCrawled'] = page['dateLastCrawled']
+            filtered_response['webPages']['value'].append(filtered_page)
+
+    # Filter for relevant news
+    if 'news' in response and 'value' in response['news']:
+        filtered_response['news'] = {'value': []}
+        for article in response['news']['value']:
+            filtered_article = {
+                'name': article['name'],
+                'url': article['url'],
+                'description': article['description'],
+                'datePublished': article['datePublished']
+            }
+            # Keep only relevant fields
+            if 'provider' in article:
+                filtered_article['provider'] = article['provider']
+            if 'category' in article:
+                filtered_article['category'] = article['category']
+            filtered_response['news']['value'].append(filtered_article)
+
+    # Filter for relevant videos
+    if 'videos' in response and 'value' in response['videos']:
+        filtered_response['videos'] = {'value': []}
+        for video in response['videos']['value']:
+            filtered_video = {
+                'name': video['name'],
+                'description': video['description'],
+                'url': video['contentUrl'],
+                'datePublished': video['datePublished'],
+                'publisher': video['publisher']
+            }
+            filtered_response['videos']['value'].append(filtered_video)
+
+    return filtered_response
+
+def search(query):
+    # Construct a request
+    mkt = 'en-US'
+    params = {
+        'q': query,
+        'mkt': mkt,
+        'safeSearch': 'Off',
+        'count': 3,
+        'answerCount': 3
+    }
+    headers = {'Ocp-Apim-Subscription-Key': "047963dcb4aa4d558018b3dcec09a3af"}
+    bing_search_endpoint = "https://api.bing.microsoft.com/v7.0/search"
+    
+    # Call the API
+    try:
+        response = requests.get(bing_search_endpoint, headers=headers, params=params)
+        response.raise_for_status()
+        json_response = response.json()
+        
+        # Remove unwanted keys
+        keys_to_remove = ['spellSuggestions', 'relatedSearches', 'rankingResponse']
+        filtered_response = {key: value for key, value in json_response.items() if key not in keys_to_remove}
+        
+        # Further filter the response
+        filtered_response = filter_response(filtered_response)
+        
+        print(json.dumps(filtered_response, indent=2))
+        return filtered_response
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred: {e}")
+        return None
+
 
 
 def settings(update, context):
@@ -164,51 +258,70 @@ def respond_to_message(update, context):
         if total_characters > 60000:
             context.user_data["messages"] = []
 
-        # Handle text messages
-        if message.text:
+        # Check if a new /web command is used
+        if message.text.startswith("/web "):
+            query = message.text[5:]  # Remove "/web " to isolate the search query
+
+            placeholder_message = context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Searching the web... this can take a while",
+                reply_to_message_id=update.message.message_id)
+            context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                         action=ChatAction.TYPING)
+
+            json_results = search(query)
+            system_message = f"The user requested a web search, here are the results: {json_results}. You are advised to use them in your response if relevant. "
             context.user_data["messages"].append({
-                "role":
-                "user",
-                "content": [{
-                    "type": "text",
-                    "text": message.text
-                }]
+                "role": "system",
+                "content": system_message
             })
 
-        # Handle image messages
-        elif message.photo:
-            # Download the largest photo size
-            file_id = message.photo[-1].file_id
-            newFile = context.bot.get_file(file_id)
-            newFile.download('temp_image.jpg')
-
-            # Encode the image to base64
-            base64_image = encode_image('temp_image.jpg')
-            os.remove('temp_image.jpg')  # Clean up the temporary image file
-
             context.user_data["messages"].append({
-                "role":
-                "user",
-                "content": [{
-                    "type":
-                    "text",
-                    "text":
-                    message.caption or "User has uploaded this image: "
-                }, {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}"
-                    }
-                }]
+                "role": "user",
+                "content": query
             })
 
-        # Send placeholder message
-        placeholder_message = context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Please wait... this can take a while",
-            reply_to_message_id=update.message.message_id)
-        context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                     action=ChatAction.TYPING)
+
+        else:
+            # Handle text messages
+            if message.text:
+                context.user_data["messages"].append({
+                    "role": "user",
+                    "content": message.text
+                })
+
+            # Handle image messages
+            elif message.photo:
+                # Download the largest photo size
+                file_id = message.photo[-1].file_id
+                newFile = context.bot.get_file(file_id)
+                newFile.download('temp_image.jpg')
+
+                # Encode the image to base64
+                base64_image = encode_image('temp_image.jpg')
+                os.remove('temp_image.jpg')  # Clean up the temporary image file
+
+                context.user_data["messages"].append({
+                    "role": "user",
+                    "content": [{
+                        "type": "text",
+                        "text": message.caption or "User has uploaded this image: "
+                    }, {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }]
+                })
+
+            # Send placeholder message
+            placeholder_message = context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Please wait... this can take a while",
+                reply_to_message_id=update.message.message_id)
+            context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                         action=ChatAction.TYPING)
+
         messages = context.user_data["messages"]
 
         # Get the selected model from user data, default to "gpt-4o" if not set
@@ -227,15 +340,14 @@ def respond_to_message(update, context):
         #print(response.choices[0].message.content)
         # Store assistant's response
         context.user_data["messages"].append({
-            "role":
-            "assistant",
-            "content":
-            response.choices[0].message.content
+            "role": "assistant",
+            "content": response.choices[0].message.content
         })
 
     except Exception as e:
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text=f"An error occurred: {str(e)}")
+
 
 
 def clear_history(update, context):
