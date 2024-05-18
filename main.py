@@ -259,7 +259,7 @@ def respond_to_message(update, context):
             context.user_data["messages"] = []
 
         # Check if a new /web command is used
-        if message.text.startswith("/web "):
+        if message.text and message.text.startswith("/web "):
             query = message.text[5:]  # Remove "/web " to isolate the search query
 
             placeholder_message = context.bot.send_message(
