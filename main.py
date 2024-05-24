@@ -255,7 +255,7 @@ def respond_to_message(update, context):
             len(msg["content"]) for msg in context.user_data["messages"])
 
         # If the total characters exceed 60,000, clear the messages array
-        if total_characters > 60000:
+        if total_characters > 20000:
             context.user_data["messages"] = []
 
         # Check if a new /web command is used
