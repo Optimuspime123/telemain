@@ -21,7 +21,7 @@ from telegram.ext import (
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 
 client = OpenAI(api_key="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")
-updater = Updater(token=BOT_TOKEN, use_context=True)
+updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
 
 
@@ -325,8 +325,8 @@ def respond_to_message(update, context):
         messages = context.user_data["messages"]
 
         # Get the selected model from user data, default to "gpt-4o" if not set
-        model = context.user_data.get("model", "gpt-4o")
-
+        #model = context.user_data.get("model", "gpt-4o")
+        model ="gpt-3.5-turbo"
         response = client.chat.completions.create(model=model,
                                                   messages=messages.copy(),
                                                   max_tokens=3000,
@@ -409,10 +409,18 @@ def report_error(exception):
     except requests.exceptions.RequestException as e:
         print(f"Failed to send error report: {str(e)}")
 
+def no_generate_image(update, context):
+    """Informs the user that image generation is unavailable."""
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Image generation is currently unavailable for this bot. Try it out at https://cogify.social/image",
+        reply_to_message_id=update.message.message_id
+    )
 
-dispatcher.add_handler(CommandHandler("clear", clear_history))
-dispatcher.add_handler(CommandHandler("start", start))
-dispatcher.add_handler(CommandHandler("img", generate_image))
+dispatcher.add_handler(CommandHandler("clear", clear_history, run_async=True))
+dispatcher.add_handler(CommandHandler("start", start, run_async=True))
+dispatcher.add_handler(CommandHandler("img", no_generate_image, run_async=True))
+dispatcher.add_handler(CommandHandler("img1", generate_image, run_async=True))
 dispatcher.add_handler(CommandHandler("settings", settings))
 dispatcher.add_handler(
     CallbackQueryHandler(
@@ -425,7 +433,7 @@ dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
                          pattern="^(gpt-4-turbo|gpt-4o)$"))
 dispatcher.add_handler(
-    MessageHandler(Filters.text | Filters.photo, respond_to_message))
+    MessageHandler(Filters.text, respond_to_message, run_async=True))
 
 # Start the bot with error handling
 while True:
