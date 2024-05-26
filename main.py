@@ -20,7 +20,7 @@ from telegram.ext import (
 
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
 
@@ -325,8 +325,8 @@ def respond_to_message(update, context):
         messages = context.user_data["messages"]
 
         # Get the selected model from user data, default to "gpt-4o" if not set
-        #model = context.user_data.get("model", "gpt-4o")
-        model ="gpt-3.5-turbo"
+        model = context.user_data.get("model", "gpt-4o")
+        #model ="gpt-3.5-turbo"
         response = client.chat.completions.create(model=model,
                                                   messages=messages.copy(),
                                                   max_tokens=3000,
@@ -419,7 +419,7 @@ def no_generate_image(update, context):
 
 dispatcher.add_handler(CommandHandler("clear", clear_history, run_async=True))
 dispatcher.add_handler(CommandHandler("start", start, run_async=True))
-dispatcher.add_handler(CommandHandler("img", no_generate_image, run_async=True))
+dispatcher.add_handler(CommandHandler("img", generate_image, run_async=True))
 dispatcher.add_handler(CommandHandler("img1", generate_image, run_async=True))
 dispatcher.add_handler(CommandHandler("settings", settings))
 dispatcher.add_handler(
@@ -433,7 +433,7 @@ dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
                          pattern="^(gpt-4-turbo|gpt-4o)$"))
 dispatcher.add_handler(
-    MessageHandler(Filters.text, respond_to_message, run_async=True))
+    MessageHandler(Filters.text | Filters.photo, respond_to_message, run_async=True))
 
 # Start the bot with error handling
 while True:
