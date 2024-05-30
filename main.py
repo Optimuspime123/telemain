@@ -319,7 +319,7 @@ def respond_to_message(update, context):
                     context.bot.send_message(
                         chat_id=update.effective_chat.id,
                         text=llama_reply,
-                        parse_mode=telegram.ParseMode.MARKDOWN)
+                        parse_mode=telegram.ParseMode.MARKDOWN_V2)
                     return
 
             # Handle image messages
