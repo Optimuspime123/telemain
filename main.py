@@ -318,8 +318,7 @@ def respond_to_message(update, context):
                     llama_reply = llama_response(update, context)
                     context.bot.send_message(
                         chat_id=update.effective_chat.id,
-                        text=llama_reply,
-                        parse_mode=telegram.ParseMode.MARKDOWN_V2)
+                        text=llama_reply)
                     return
 
             # Handle image messages
