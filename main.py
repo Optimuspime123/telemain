@@ -470,7 +470,8 @@ dispatcher.add_handler(
                          pattern="^(standard|hd)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
-                         pattern="^(gpt-4-turbo|gpt-4o)$"))
+                         pattern="^(gpt-4-turbo|gpt-4o|llama-3|mixtral|claude)$"))
+
 dispatcher.add_handler(
     MessageHandler(Filters.text | Filters.photo, respond_to_message, run_async=True))
 
