@@ -20,7 +20,7 @@ from telegram.ext import (
 
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 
-client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
+oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
 
@@ -292,6 +292,14 @@ def respond_to_message(update, context):
 
             # Handle image messages
             elif message.photo:
+                model = context.user_data.get("model", "gpt-4o")
+                if model not in ["gpt-4-turbo", "gpt-4o"]:
+                    context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Your chosen model does not support images as input. Please send a text message or switch models from /settings.",
+                    reply_to_message_id=update.message.message_id
+                    )
+                    return
                 # Download the largest photo size
                 file_id = message.photo[-1].file_id
                 newFile = context.bot.get_file(file_id)
@@ -327,7 +335,7 @@ def respond_to_message(update, context):
         # Get the selected model from user data, default to "gpt-4o" if not set
         model = context.user_data.get("model", "gpt-4o")
         #model ="gpt-3.5-turbo"
-        response = client.chat.completions.create(model=model,
+        response = oai_client.chat.completions.create(model=model,
                                                   messages=messages.copy(),
                                                   max_tokens=2024,
                                                   stream=False)
@@ -378,7 +386,7 @@ def generate_image(update, context):
         # Get the selected quality from user data, default to "standard" if not set
         quality = context.user_data.get("quality", "standard")
 
-        response = client.images.generate(
+        response = oai_client.images.generate(
             model="dall-e-3",
             prompt=prompt,
             size="1024x1024",
