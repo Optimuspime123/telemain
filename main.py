@@ -19,7 +19,7 @@ from telegram.ext import (
 )
 
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
-
+anyscale_client = OpenAI(base_url="https://api.endpoints.anyscale.com/v1",api_key="esecret_r5x1g895b4cfe2rlp4cjylmf7d")
 oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
@@ -194,7 +194,7 @@ def settings_callback(update, context):
     elif setting == "default_model":
         keyboard = [[
             InlineKeyboardButton("GPT-4-Turbo", callback_data="gpt-4-turbo")
-        ], [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")]]
+        ], [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],[InlineKeyboardButton("Llama-3-70b", callback_data="llama-3")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose default model for making requests:",
                                 reply_markup=reply_markup)
@@ -219,6 +219,21 @@ def default_model_callback(update, context):
     query.answer()
     query.edit_message_text(f"Default model set to: {model}")
 
+
+def llama_response(update, context):
+    messages = context.user_data.get("messages", [])
+    # Remove any message with type: image_url
+    messages = [msg for msg in messages if not (isinstance(msg["content"], list) and any("image_url" in part for part in msg["content"]))]
+    context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                         action=ChatAction.TYPING)
+    response = anyscale_client.chat.completions.create(
+        model='meta-llama/Meta-Llama-3-70B-Instruct',
+        messages=messages.copy(),
+        stream=False,
+        max_tokens=2000
+    )
+
+    return response.choices[0].message.content
 
 def respond_to_message(update, context):
     """Handles user text and image messages, sends to OpenAI."""
@@ -288,7 +303,6 @@ def respond_to_message(update, context):
                 "content": query
             })
 
-
         else:
             # Handle text messages
             if message.text:
@@ -296,6 +310,17 @@ def respond_to_message(update, context):
                     "role": "user",
                     "content": message.text
                 })
+
+                # Check if the selected model is llama-3 and call llama_response
+                if context.user_data.get("model") == "llama-3":
+                    context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                         action=ChatAction.TYPING)
+                    llama_reply = llama_response(update, context)
+                    context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=llama_reply,
+                        parse_mode=telegram.ParseMode.MARKDOWN)
+                    return
 
             # Handle image messages
             elif message.photo:
@@ -341,7 +366,6 @@ def respond_to_message(update, context):
 
         # Get the selected model from user data, default to "gpt-4o" if not set
         model = context.user_data.get("model", "gpt-4o")
-        #model ="gpt-3.5-turbo"
         response = oai_client.chat.completions.create(model=model,
                                                   messages=messages.copy(),
                                                   max_tokens=2024,
