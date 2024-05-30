@@ -243,7 +243,7 @@ def respond_to_message(update, context):
                 "sys_prompt",
                 f"You are Cogify, an advanced Telegram AI bot built to help users. You can process text and image inputs using the GPT-4 model, and can generate images using DALL-E3 - command is /img "
                 "{prompt}"
-                ". Be friendly and helpful! The user's first name is {sanitized_name} or 'the user' , use it sparingly in conversation. More information about your developer can be found by the user at https://cogify.social , promote it only if user asks for info about yourself. Use  Markdown format if you wish to format responses , to clear conversation history user should send /clear. To choose settings they can send /settings "
+                ". Be friendly and helpful! The user's first name is {sanitized_name} or 'the user' , use it sparingly in conversation. More information about your developer can be found by the user at https://cogify.social , promote it only if user asks for info about yourself. to clear conversation history user should send /clear. To choose settings they can send /settings . To get results from the internet they can use /web {query}  "
             )
             context.user_data["messages"].append({
                 "role": "system",
@@ -329,7 +329,7 @@ def respond_to_message(update, context):
         #model ="gpt-3.5-turbo"
         response = client.chat.completions.create(model=model,
                                                   messages=messages.copy(),
-                                                  max_tokens=3000,
+                                                  max_tokens=2024,
                                                   stream=False)
 
         context.bot.edit_message_text(
