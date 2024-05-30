@@ -346,7 +346,7 @@ def respond_to_message(update, context):
 
     except Exception as e:
         context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text=f"An error occurred: {str(e)}")
+                                 text=f"Sorry , An error occurred: {str(e)} You can try to switch to a different model from /settings")
 
 
 
