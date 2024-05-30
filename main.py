@@ -20,7 +20,7 @@ from telegram.ext import (
 
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
 
