@@ -152,7 +152,13 @@ def search(query):
 
 
 def settings(update, context):
-    """Sends inline keyboard buttons to choose settings to modify."""
+    """Shows current settings and sends inline keyboard buttons to choose settings to modify."""
+    model = context.user_data.get("model", "Default - gpt-4o")
+    quality = context.user_data.get("quality", "standard")
+    sys_prompt = context.user_data.get("sys_prompt", "Default")
+
+    current_settings = f"Current settings:\n\n🤖 Default model: {model}\n🖼️ Generation quality: {quality}\n✨ System prompt: {sys_prompt}\n"
+
     keyboard = [[
         InlineKeyboardButton(" 🖼️ Generation quality",
                              callback_data="generation_quality")
@@ -162,9 +168,10 @@ def settings(update, context):
         InlineKeyboardButton(" 🤖Default model", callback_data="default_model")
     ]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text("Choose which setting you wish to modify:",
+    update.message.reply_text(current_settings + "Choose which setting you wish to modify:",
                               reply_markup=reply_markup,
                               reply_to_message_id=update.message.message_id)
+
 
 
 def settings_callback(update, context):
