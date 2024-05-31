@@ -302,6 +302,14 @@ def respond_to_message(update, context):
                 "role": "user",
                 "content": query
             })
+            if context.user_data.get("model") == "llama-3": #web-search with llama3 , cannot go to openai 
+                    context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                         action=ChatAction.TYPING)
+                    llama_reply = llama_response(update, context)
+                    context.bot.send_message(
+                        chat_id=update.effective_chat.id,
+                        text=llama_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                    return
 
         else:
             # Handle text messages
