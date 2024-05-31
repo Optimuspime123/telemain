@@ -19,7 +19,7 @@ from telegram.ext import (
 )
 
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
-anyscale_client = OpenAI(base_url="https://api.endpoints.anyscale.com/v1",api_key="esecret_r5x1g895b4cfe2rlp4cjylmf7d")
+together_client = OpenAI(base_url="https://api.together.xyz/v1",api_key="16ff1d36af3cec010d8a5cec9da2fd02b9ac6094921c1ab9877cf6c633ed34b3")
 oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
@@ -226,8 +226,8 @@ def llama_response(update, context):
     messages = [msg for msg in messages if not (isinstance(msg["content"], list) and any("image_url" in part for part in msg["content"]))]
     context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                          action=ChatAction.TYPING)
-    response = anyscale_client.chat.completions.create(
-        model='meta-llama/Meta-Llama-3-70B-Instruct',
+    response = together_client.chat.completions.create(
+        model='meta-llama/Llama-3-70b-chat-hf',
         messages=messages.copy(),
         stream=False,
         max_tokens=2000
