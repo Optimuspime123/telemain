@@ -192,9 +192,7 @@ def settings_callback(update, context):
         )
         context.user_data["awaiting_sys_prompt"] = True
     elif setting == "default_model":
-        keyboard = ["""[
-        InlineKeyboardButton("GPT-4-Turbo", callback_data="gpt-4-turbo")
-        ]""" [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],[InlineKeyboardButton("Llama-3-70b", callback_data="llama-3")]]
+        keyboard = [[InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],[InlineKeyboardButton("Llama-3-70b", callback_data="llama-3")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose default model for making requests:",
                                 reply_markup=reply_markup)
