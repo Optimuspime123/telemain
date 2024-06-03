@@ -226,7 +226,7 @@ def default_model_callback(update, context):
     query.edit_message_text(f"Default model set to: {model}")
 
 
-def llama_response(update, context):
+def pplx_response(update, context):
     messages = context.user_data.get("messages", [])
     model = context.user_data.get("model", "llama-3-8b-instruct")  # Retrieve model or use default
     
@@ -269,9 +269,9 @@ def respond_to_message(update, context):
             # Append the system prompt if it doesn't exist
             system_prompt = context.user_data.get(
                 "sys_prompt",
-                f"You are Cogify, an advanced Telegram AI bot built to help users. You can process text and image inputs using the GPT-4 model, and can generate images using DALL-E3 - command is /img "
+                f"You are Cogify, an advanced Telegram AI bot built to help users. You can process text (and image inputs using the GPT-4o model), and can generate images using DALL-E3 - command is /img "
                 "{prompt}"
-                ". Be friendly and helpful! More information about your developer can be found by the user at https://cogify.social , promote it only if user asks for info about yourself. to clear conversation history user should send /clear. To choose settings they can send /settings . To get results from the internet they can use /web {query}  "
+                ". Be friendly and helpful!  to clear conversation history user should send /clear. To choose settings and change AI Model used they can send /settings . To get results from the internet they can use /web {query}  "
             )
             context.user_data["messages"].append({
                 "role": "system",
@@ -308,15 +308,15 @@ def respond_to_message(update, context):
                 "role": "user",
                 "content": query
             })
-            # Check if the selected model is not gpt-4o and call llama_response
+            # Check if the selected model is not gpt-4o and call pplx_response
             model = context.user_data.get("model", "gpt-4o")
             if model not in ["gpt-4o"]:
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
-                llama_reply = llama_response(update, context)
+                pplx_reply = pplx_response(update, context)
                 context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=llama_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                    text=pplx_reply, parse_mode=telegram.ParseMode.MARKDOWN)
                 return
 
         else:
@@ -327,15 +327,19 @@ def respond_to_message(update, context):
                     "content": message.text
                 })
 
-                # Check if the selected model is not gpt-4o and call llama_response
+                # Check if the selected model is not gpt-4o and call pplx_response
                 model = context.user_data.get("model", "gpt-4o")
                 if model not in ["gpt-4o"]:
                     context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                                  action=ChatAction.TYPING)
-                    llama_reply = llama_response(update, context)
+                    pplx_reply = pplx_response(update, context)
                     context.bot.send_message(
                         chat_id=update.effective_chat.id,
-                        text=llama_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                        text=pplx_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                    context.user_data["messages"].append({
+                        "role": "assistant",
+                        "content": pplx_reply
+                    })        
                     return
 
             # Handle image messages
