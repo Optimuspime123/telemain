@@ -19,7 +19,7 @@ from telegram.ext import (
 )
 
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
-together_client = OpenAI(base_url="https://api.together.xyz/v1",api_key="16ff1d36af3cec010d8a5cec9da2fd02b9ac6094921c1ab9877cf6c633ed34b3")
+pplx_client = OpenAI(base_url="https://api.perplexity.ai",api_key="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")
 oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
@@ -192,12 +192,20 @@ def settings_callback(update, context):
         )
         context.user_data["awaiting_sys_prompt"] = True
     elif setting == "default_model":
-        keyboard = [[InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],[InlineKeyboardButton("Llama-3-70b", callback_data="llama-3")]]
+        keyboard = [
+            [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],
+            [InlineKeyboardButton("Llama3-70b", callback_data="llama-3-70b-instruct")],
+            [InlineKeyboardButton("Llama3-8b", callback_data="llama-3-8b-instruct")],
+            [InlineKeyboardButton("Llama3-70b Online", callback_data="llama-3-sonar-large-32k-online")],
+            [InlineKeyboardButton("Llama3-8b Online", callback_data="llama-3-sonar-small-32k-online")],
+            [InlineKeyboardButton("Mixtral", callback_data="mixtral-8x7b-instruct")]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose default model for making requests:",
                                 reply_markup=reply_markup)
 
     query.answer()
+
 
 
 def generation_quality_callback(update, context):
@@ -220,21 +228,21 @@ def default_model_callback(update, context):
 
 def llama_response(update, context):
     messages = context.user_data.get("messages", [])
-    # Remove any message with type: image_url
-    messages = [msg for msg in messages if not (isinstance(msg["content"], list) and any("image_url" in part for part in msg["content"]))]
-    context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                         action=ChatAction.TYPING)
-    response = together_client.chat.completions.create(
-        model='meta-llama/Llama-3-70b-chat-hf',
+    model = context.user_data.get("model", "llama-3-8b-instruct")  # Retrieve model or use default
+    
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    response = pplx_client.chat.completions.create(
+        model=model,  # Use the retrieved model
         messages=messages.copy(),
         stream=False,
         max_tokens=2000
     )
-
+    
     return response.choices[0].message.content
 
 def respond_to_message(update, context):
-    """Handles user text and image messages, sends to OpenAI."""
+    """Handles user text and image messages, sends for inference."""
     try:
         user = update.effective_user
         message = update.message
@@ -300,14 +308,16 @@ def respond_to_message(update, context):
                 "role": "user",
                 "content": query
             })
-            if context.user_data.get("model") == "llama-3": #web-search with llama3 , cannot go to openai 
-                    context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                         action=ChatAction.TYPING)
-                    llama_reply = llama_response(update, context)
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=llama_reply, parse_mode=telegram.ParseMode.MARKDOWN)
-                    return
+            # Check if the selected model is not gpt-4o and call llama_response
+            model = context.user_data.get("model", "gpt-4o")
+            if model not in ["gpt-4o"]:
+                context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                             action=ChatAction.TYPING)
+                llama_reply = llama_response(update, context)
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=llama_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                return
 
         else:
             # Handle text messages
@@ -317,10 +327,11 @@ def respond_to_message(update, context):
                     "content": message.text
                 })
 
-                # Check if the selected model is llama-3 and call llama_response
-                if context.user_data.get("model") == "llama-3":
+                # Check if the selected model is not gpt-4o and call llama_response
+                model = context.user_data.get("model", "gpt-4o")
+                if model not in ["gpt-4o"]:
                     context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                         action=ChatAction.TYPING)
+                                                 action=ChatAction.TYPING)
                     llama_reply = llama_response(update, context)
                     context.bot.send_message(
                         chat_id=update.effective_chat.id,
@@ -332,9 +343,9 @@ def respond_to_message(update, context):
                 model = context.user_data.get("model", "gpt-4o")
                 if model not in ["gpt-4-turbo", "gpt-4o"]:
                     context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text="Your chosen model does not support images as input. Please send a text message or switch models from /settings.",
-                    reply_to_message_id=update.message.message_id
+                        chat_id=update.effective_chat.id,
+                        text="Your chosen model does not support images as input. Please send a text message or switch models from /settings.",
+                        reply_to_message_id=update.message.message_id
                     )
                     return
                 # Download the largest photo size
@@ -372,9 +383,9 @@ def respond_to_message(update, context):
         # Get the selected model from user data, default to "gpt-4o" if not set
         model = context.user_data.get("model", "gpt-4o")
         response = oai_client.chat.completions.create(model=model,
-                                                  messages=messages.copy(),
-                                                  max_tokens=2024,
-                                                  stream=False)
+                                                      messages=messages.copy(),
+                                                      max_tokens=2024,
+                                                      stream=False)
 
         context.bot.edit_message_text(
             chat_id=update.effective_chat.id,
@@ -390,9 +401,7 @@ def respond_to_message(update, context):
 
     except Exception as e:
         context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text=f"Sorry , An error occurred: {str(e)} You can try to switch to a different model from /settings")
-
-
+                                 text=f"Sorry, An error occurred: {str(e)}. You can try to switch to a different model from /settings.")
 
 def clear_history(update, context):
     """Clears the message history for the user."""
