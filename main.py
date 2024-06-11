@@ -21,6 +21,9 @@ from telegram.ext import (
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 pplx_client = OpenAI(base_url="https://api.perplexity.ai",api_key="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")
 oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
+any_client = OpenAI(api_key="any-6739b5cbf1531d8a",base_url="https://api.discord.rocks")
+fresed_client = OpenAI(base_url="https://fresedgpt.space/v1", api_key="fresed-aRxFAtH4C1u93VN0G7E59CaHw9L6V2")
+
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
 
@@ -104,7 +107,9 @@ def settings_callback(update, context):
             [InlineKeyboardButton("Llama3-8b", callback_data="llama-3-8b-instruct")],
             [InlineKeyboardButton("Llama3-70b Online", callback_data="llama-3-sonar-large-32k-online")],
             [InlineKeyboardButton("Llama3-8b Online", callback_data="llama-3-sonar-small-32k-online")],
-            [InlineKeyboardButton("Mixtral", callback_data="mixtral-8x7b-instruct")]
+            [InlineKeyboardButton("Mixtral", callback_data="mixtral-8x7b-instruct")],
+            [InlineKeyboardButton("Any Uncensored", callback_data="any-uncensored")],
+            [InlineKeyboardButton("Claude 3 Opus", callback_data="claude-3-opus")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose default model for making requests:",
@@ -139,6 +144,34 @@ def pplx_response(update, context):
     
     response = pplx_client.chat.completions.create(
         model=model,  # Use the retrieved model
+        messages=messages.copy(),
+        stream=False,
+        max_tokens=2000
+    )
+    
+    return response.choices[0].message.content
+
+def anyAI_response(update, context):
+    messages = context.user_data.get("messages", [])
+    
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    response = any_client.chat.completions.create(
+        model="any-uncensored",
+        messages=messages.copy(),
+        stream=False,
+        max_tokens=2000
+    )
+    
+    return response.choices[0].message.content
+
+def fresed_response(update, context):
+    messages = context.user_data.get("messages", [])
+    
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    response = fresed_client.chat.completions.create(
+        model="claude-3-opus",
         messages=messages.copy(),
         stream=False,
         max_tokens=2000
@@ -207,7 +240,7 @@ def respond_to_message(update, context):
 
             # Check if the selected model is not gpt-4o and call pplx_response
             model = context.user_data.get("model", "gpt-4o")
-            if model not in ["gpt-4o"]:
+            if model in ["llama-3-8b-instruct", "llama-3-70b-instruct", "mixtral-8x7b-instruct", "llama-3-sonar-large-32k-online", "llama-3-sonar-small-32k-online"]:
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
                 pplx_reply = pplx_response(update, context)
@@ -217,6 +250,30 @@ def respond_to_message(update, context):
                 context.user_data["messages"].append({
                     "role": "assistant",
                     "content": pplx_reply
+                })        
+                return
+            elif model == "any-uncensored":
+                context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                             action=ChatAction.TYPING)
+                anyAI_reply = anyAI_response(update, context)
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=anyAI_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                context.user_data["messages"].append({
+                    "role": "assistant",
+                    "content": anyAI_reply
+                })        
+                return
+            elif model == "claude-3-opus":
+                context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                             action=ChatAction.TYPING)
+                fresed_reply = fresed_response(update, context)
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=fresed_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                context.user_data["messages"].append({
+                    "role": "assistant",
+                    "content": fresed_reply
                 })        
                 return
 
@@ -369,8 +426,7 @@ dispatcher.add_handler(
                          pattern="^(standard|hd)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
-                         pattern="^(gpt-4o|llama-3-70b-instruct|llama-3-8b-instruct|llama-3-sonar-large-32k-online|llama-3-sonar-small-32k-online|mixtral-8x7b-instruct)$"))
-
+                         pattern="^(gpt-4o|llama-3-70b-instruct|llama-3-8b-instruct|llama-3-sonar-large-32k-online|llama-3-sonar-small-32k-online|mixtral-8x7b-instruct|any-uncensored|claude-3-opus)$"))
 
 dispatcher.add_handler(
     MessageHandler(Filters.text | Filters.photo, respond_to_message, run_async=True))
