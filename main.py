@@ -58,99 +58,6 @@ def start(update, context):
         reply_to_message_id=update.message.message_id)
 
 
-def filter_response(response):
-    filtered_response = {}
-
-    # Filter for timezone information
-    if 'timeZone' in response:
-        filtered_response['timeZone'] = {}
-        if 'primaryCityTime' in response['timeZone']:
-            filtered_response['timeZone']['primaryCityTime'] = {
-                key: value for key, value in response['timeZone']['primaryCityTime'].items() if key != 'utcOffset'
-            }
-
-    # Filter for relevant web pages
-    if 'webPages' in response and 'value' in response['webPages']:
-        filtered_response['webPages'] = {'value': []}
-        for page in response['webPages']['value']:
-            filtered_page = {
-                'name': page.get('name', ''),
-                'url': page.get('url', ''),
-                'snippet': page.get('snippet', '')
-            }
-            # Keep only relevant fields
-            if 'displayUrl' in page:
-                filtered_page['displayUrl'] = page.get('displayUrl', '')
-            if 'dateLastCrawled' in page:
-                filtered_page['dateLastCrawled'] = page.get('dateLastCrawled', '')
-            filtered_response['webPages']['value'].append(filtered_page)
-
-    # Filter for relevant news
-    if 'news' in response and 'value' in response['news']:
-        filtered_response['news'] = {'value': []}
-        for article in response['news']['value']:
-            filtered_article = {
-                'name': article.get('name', ''),
-                'url': article.get('url', ''),
-                'description': article.get('description', ''),
-                'datePublished': article.get('datePublished', '')
-            }
-            # Keep only relevant fields
-            if 'provider' in article:
-                filtered_article['provider'] = article.get('provider', '')
-            if 'category' in article:
-                filtered_article['category'] = article.get('category', '')
-            filtered_response['news']['value'].append(filtered_article)
-
-    # Filter for relevant videos
-    if 'videos' in response and 'value' in response['videos']:
-        filtered_response['videos'] = {'value': []}
-        for video in response['videos']['value']:
-            filtered_video = {
-                'name': video.get('name', ''),
-                'description': video.get('description', ''),
-                'url': video.get('contentUrl', ''),
-                'datePublished': video.get('datePublished', ''),
-                'publisher': video.get('publisher', '')
-            }
-            filtered_response['videos']['value'].append(filtered_video)
-
-    return filtered_response
-    
-def search(query):
-    # Construct a request
-    mkt = 'en-US'
-    params = {
-        'q': query,
-        'mkt': mkt,
-        'safeSearch': 'Off',
-        'count': 3,
-        'answerCount': 3
-    }
-    headers = {'Ocp-Apim-Subscription-Key': "047963dcb4aa4d558018b3dcec09a3af"}
-    bing_search_endpoint = "https://api.bing.microsoft.com/v7.0/search"
-    
-    # Call the API
-    try:
-        response = requests.get(bing_search_endpoint, headers=headers, params=params)
-        response.raise_for_status()
-        json_response = response.json()
-        
-        # Remove unwanted keys
-        keys_to_remove = ['spellSuggestions', 'relatedSearches', 'rankingResponse']
-        filtered_response = {key: value for key, value in json_response.items() if key not in keys_to_remove}
-        
-        # Further filter the response
-        filtered_response = filter_response(filtered_response)
-        
-        print(json.dumps(filtered_response, indent=2))
-        return filtered_response
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred: {e}")
-        return None
-
-
-
 def settings(update, context):
     """Shows current settings and sends inline keyboard buttons to choose settings to modify."""
     model = context.user_data.get("model", "Default - gpt-4o")
@@ -171,7 +78,6 @@ def settings(update, context):
     update.message.reply_text(current_settings + "Choose which setting you wish to modify:",
                               reply_markup=reply_markup,
                               reply_to_message_id=update.message.message_id)
-
 
 
 def settings_callback(update, context):
@@ -207,7 +113,6 @@ def settings_callback(update, context):
     query.answer()
 
 
-
 def generation_quality_callback(update, context):
     """Handles the generation quality callback and stores the chosen quality."""
     query = update.callback_query
@@ -240,6 +145,7 @@ def pplx_response(update, context):
     )
     
     return response.choices[0].message.content
+
 
 def respond_to_message(update, context):
     """Handles user text and image messages, sends for inference."""
@@ -286,28 +192,19 @@ def respond_to_message(update, context):
         if total_characters > 20000:
             context.user_data["messages"] = []
 
-        # Check if a new /web command is used
-        if message.text and message.text.startswith("/web "):
-            query = message.text[5:]  # Remove "/web " to isolate the search query
-
-            placeholder_message = context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Searching the web... this can take a while",
-                reply_to_message_id=update.message.message_id)
-            context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                         action=ChatAction.TYPING)
-
-            json_results = search(query)
-            system_message = f"The user requested a web search, here are the results: {json_results}. You are advised to use them in your response and cite sources if relevant . "
-            context.user_data["messages"].append({
-                "role": "assistant",
-                "content": system_message
-            })
+        # Handle text messages
+        if message.text:
+            if message.text.startswith("/web "):
+                update.message.reply_text(
+                    "This command is deprecated, please switch to one of the online models from /settings for better web-powered responses.",
+                    reply_to_message_id=update.message.message_id)
+                return
 
             context.user_data["messages"].append({
                 "role": "user",
-                "content": query
+                "content": message.text
             })
+
             # Check if the selected model is not gpt-4o and call pplx_response
             model = context.user_data.get("model", "gpt-4o")
             if model not in ["gpt-4o"]:
@@ -317,70 +214,51 @@ def respond_to_message(update, context):
                 context.bot.send_message(
                     chat_id=update.effective_chat.id,
                     text=pplx_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                context.user_data["messages"].append({
+                    "role": "assistant",
+                    "content": pplx_reply
+                })        
                 return
 
-        else:
-            # Handle text messages
-            if message.text:
-                context.user_data["messages"].append({
-                    "role": "user",
-                    "content": message.text
-                })
+        # Handle image messages
+        elif message.photo:
+            model = context.user_data.get("model", "gpt-4o")
+            if model not in ["gpt-4-turbo", "gpt-4o"]:
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text="Your chosen model does not support images as input. Please send a text message or switch models from /settings.",
+                    reply_to_message_id=update.message.message_id
+                )
+                return
+            # Download the largest photo size
+            file_id = message.photo[-1].file_id
+            newFile = context.bot.get_file(file_id)
+            newFile.download('temp_image.jpg')
 
-                # Check if the selected model is not gpt-4o and call pplx_response
-                model = context.user_data.get("model", "gpt-4o")
-                if model not in ["gpt-4o"]:
-                    context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                                 action=ChatAction.TYPING)
-                    pplx_reply = pplx_response(update, context)
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text=pplx_reply, parse_mode=telegram.ParseMode.MARKDOWN)
-                    context.user_data["messages"].append({
-                        "role": "assistant",
-                        "content": pplx_reply
-                    })        
-                    return
+            # Encode the image to base64
+            base64_image = encode_image('temp_image.jpg')
+            os.remove('temp_image.jpg')  # Clean up the temporary image file
 
-            # Handle image messages
-            elif message.photo:
-                model = context.user_data.get("model", "gpt-4o")
-                if model not in ["gpt-4-turbo", "gpt-4o"]:
-                    context.bot.send_message(
-                        chat_id=update.effective_chat.id,
-                        text="Your chosen model does not support images as input. Please send a text message or switch models from /settings.",
-                        reply_to_message_id=update.message.message_id
-                    )
-                    return
-                # Download the largest photo size
-                file_id = message.photo[-1].file_id
-                newFile = context.bot.get_file(file_id)
-                newFile.download('temp_image.jpg')
+            context.user_data["messages"].append({
+                "role": "user",
+                "content": [{
+                    "type": "text",
+                    "text": message.caption or "User has uploaded this image: "
+                }, {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}"
+                    }
+                }]
+            })
 
-                # Encode the image to base64
-                base64_image = encode_image('temp_image.jpg')
-                os.remove('temp_image.jpg')  # Clean up the temporary image file
-
-                context.user_data["messages"].append({
-                    "role": "user",
-                    "content": [{
-                        "type": "text",
-                        "text": message.caption or "User has uploaded this image: "
-                    }, {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{base64_image}"
-                        }
-                    }]
-                })
-
-            # Send placeholder message
-            placeholder_message = context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Please wait... this can take a while",
-                reply_to_message_id=update.message.message_id)
-            context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                         action=ChatAction.TYPING)
+        # Send placeholder message
+        placeholder_message = context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Please wait... this can take a while",
+            reply_to_message_id=update.message.message_id)
+        context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                     action=ChatAction.TYPING)
 
         messages = context.user_data["messages"]
 
@@ -406,6 +284,7 @@ def respond_to_message(update, context):
     except Exception as e:
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text=f"Sorry, An error occurred: {str(e)}. You can try to switch to a different model from /settings.")
+
 
 def clear_history(update, context):
     """Clears the message history for the user."""
@@ -466,6 +345,7 @@ def report_error(exception):
     except requests.exceptions.RequestException as e:
         print(f"Failed to send error report: {str(e)}")
 
+
 def no_generate_image(update, context):
     """Informs the user that image generation is unavailable."""
     context.bot.send_message(
@@ -473,6 +353,7 @@ def no_generate_image(update, context):
         text="Image generation is currently unavailable for this bot. Try it out at https://cogify.social/image",
         reply_to_message_id=update.message.message_id
     )
+
 
 dispatcher.add_handler(CommandHandler("clear", clear_history, run_async=True))
 dispatcher.add_handler(CommandHandler("start", start, run_async=True))
