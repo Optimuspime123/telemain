@@ -90,8 +90,12 @@ def settings_callback(update, context):
 
     if setting == "generation_quality":
         keyboard = [[
-            InlineKeyboardButton("Standard", callback_data="standard")
-        ], [InlineKeyboardButton("HD", callback_data="hd")]]
+            InlineKeyboardButton("DALL-E 3 - Standard", callback_data="standard")
+        ], [
+            InlineKeyboardButton("DALL-E 3 - HD", callback_data="hd")
+        ], [
+            InlineKeyboardButton("SDXL (base + refiner)", callback_data="sdxl")
+        ]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose image generation quality:",
                                 reply_markup=reply_markup)
@@ -351,8 +355,19 @@ def clear_history(update, context):
                              reply_to_message_id=update.message.message_id)
 
 
+def getSDXLimage(prompt):
+    """Generates an image using SDXL based on the provided prompt."""
+    try:
+        url = f"https://api.discord.rocks/imagine?prompt={prompt}&negative_prompt=low+quality&width=1024&height=1024&steps=30&seed=-1&model=sdxl"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.content
+    except Exception as e:
+        raise RuntimeError(f"Failed to generate image with SDXL: {str(e)}")
+
+
 def generate_image(update, context):
-    """Generates an image using DALL-E 3 based on the provided prompt."""
+    """Generates an image using DALL-E 3 or SDXL based on the provided prompt."""
     try:
         prompt = ' '.join(context.args)
         if not prompt:
@@ -371,21 +386,30 @@ def generate_image(update, context):
         # Get the selected quality from user data, default to "standard" if not set
         quality = context.user_data.get("quality", "standard")
 
-        response = oai_client.images.generate(
-            model="dall-e-3",
-            prompt=prompt,
-            size="1024x1024",
-            quality=quality,
-            n=1,
-        )
+        if quality == "sdxl":
+            image_data = getSDXLimage(prompt)
+            context.bot.delete_message(chat_id=update.effective_chat.id,
+                                       message_id=placeholder_message.message_id)
+            context.bot.send_photo(chat_id=update.effective_chat.id,
+                                   photo=image_data,
+                                   caption=prompt,
+                                   reply_to_message_id=update.message.message_id)
+        else:
+            response = oai_client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size="1024x1024",
+                quality=quality,
+                n=1,
+            )
 
-        image_url = response.data[0].url
-        context.bot.delete_message(chat_id=update.effective_chat.id,
-                                   message_id=placeholder_message.message_id)
-        context.bot.send_photo(chat_id=update.effective_chat.id,
-                               photo=image_url,
-                               caption=prompt,
-                               reply_to_message_id=update.message.message_id)
+            image_url = response.data[0].url
+            context.bot.delete_message(chat_id=update.effective_chat.id,
+                                       message_id=placeholder_message.message_id)
+            context.bot.send_photo(chat_id=update.effective_chat.id,
+                                   photo=image_url,
+                                   caption=prompt,
+                                   reply_to_message_id=update.message.message_id)
     except Exception as e:
         context.bot.send_message(chat_id=update.effective_chat.id,
                                  text=f"An error occurred: {str(e)}")
@@ -423,7 +447,7 @@ dispatcher.add_handler(
         pattern="^(generation_quality|system_prompt|default_model)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(generation_quality_callback,
-                         pattern="^(standard|hd)$"))
+                         pattern="^(standard|hd|sdxl)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
                          pattern="^(gpt-4o|llama-3-70b-instruct|llama-3-8b-instruct|llama-3-sonar-large-32k-online|llama-3-sonar-small-32k-online|mixtral-8x7b-instruct|any-uncensored|claude-3-opus)$"))
