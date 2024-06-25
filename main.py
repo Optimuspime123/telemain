@@ -161,10 +161,10 @@ def anyAI_response(update, context):
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
     response = any_client.chat.completions.create(
-        model="any-uncensored",
+        model="claude-3.5-sonnet",
         messages=messages.copy(),
         stream=False,
-        max_tokens=2000
+        max_tokens=4000
     )
     
     return response.choices[0].message.content
