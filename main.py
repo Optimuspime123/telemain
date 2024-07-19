@@ -112,7 +112,7 @@ def settings_callback(update, context):
             [InlineKeyboardButton("Llama3-70b Online", callback_data="llama-3-sonar-large-32k-online")],
             [InlineKeyboardButton("Llama3-8b Online", callback_data="llama-3-sonar-small-32k-online")],
             [InlineKeyboardButton("Mixtral", callback_data="mixtral-8x7b-instruct")],
-            [InlineKeyboardButton("Any Uncensored", callback_data="any-uncensored")],
+            [InlineKeyboardButton("DEPRECATED MODEL _ DO NOT USE", callback_data="any-uncensored")],
             [InlineKeyboardButton("Claude 3.5 Sonnet", callback_data="claude-3-5-sonnet-20240620")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
