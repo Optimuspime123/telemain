@@ -242,25 +242,13 @@ def respond_to_message(update, context):
                     "content": pplx_reply
                 })        
                 return
-            elif model == "any-uncensored":
-                context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                             action=ChatAction.TYPING)
-                anyAI_reply = anyAI_response(update, context)
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=anyAI_reply, parse_mode=telegram.ParseMode.MARKDOWN)
-                context.user_data["messages"].append({
-                    "role": "assistant",
-                    "content": anyAI_reply
-                })        
-                return
             elif model == "claude-3-5-sonnet-20240620":
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
                 anyAI_reply = anyAI_response(update, context)
                 context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=fresed_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                    text=anyAI_reply, parse_mode=telegram.ParseMode.MARKDOWN)
                 context.user_data["messages"].append({
                     "role": "assistant",
                     "content": anyAI_reply
