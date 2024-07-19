@@ -22,7 +22,7 @@ BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 pplx_client = OpenAI(base_url="https://api.perplexity.ai",api_key="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")
 oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 any_client = OpenAI(api_key="meowmeow69",base_url="https://api.discord.rocks")
-fresed_client = OpenAI(base_url="https://fresedgpt.space/v1", api_key="fresed-aRxFAtH4C1u93VN0G7E59CaHw9L6V2")
+#fresed_client = OpenAI(base_url="https://fresedgpt.space/v1", api_key="fresed-aRxFAtH4C1u93VN0G7E59CaHw9L6V2")
 
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
 dispatcher = updater.dispatcher
@@ -106,7 +106,7 @@ def settings_callback(update, context):
         context.user_data["awaiting_sys_prompt"] = True
     elif setting == "default_model":
         keyboard = [
-            [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],
+            [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o-mini")],
             [InlineKeyboardButton("Llama3-70b", callback_data="llama-3-70b-instruct")],
             [InlineKeyboardButton("Llama3-8b", callback_data="llama-3-8b-instruct")],
             [InlineKeyboardButton("Llama3-70b Online", callback_data="llama-3-sonar-large-32k-online")],
@@ -165,20 +165,6 @@ def anyAI_response(update, context):
         messages=messages.copy(),
         stream=False,
         max_tokens=4000
-    )
-    
-    return response.choices[0].message.content
-
-def fresed_response(update, context):
-    messages = context.user_data.get("messages", [])
-    
-    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    
-    response = fresed_client.chat.completions.create(
-        model="claude-3-opus",
-        messages=messages.copy(),
-        stream=False,
-        max_tokens=2000
     )
     
     return response.choices[0].message.content
@@ -243,7 +229,7 @@ def respond_to_message(update, context):
             })
 
             # Check if the selected model is not gpt-4o and call pplx_response
-            model = context.user_data.get("model", "gpt-4o")
+            model = context.user_data.get("model", "gpt-4o-mini")
             if model in ["llama-3-8b-instruct", "llama-3-70b-instruct", "mixtral-8x7b-instruct", "llama-3-sonar-large-32k-online", "llama-3-sonar-small-32k-online"]:
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
@@ -271,20 +257,20 @@ def respond_to_message(update, context):
             elif model == "claude-3-opus":
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
-                fresed_reply = fresed_response(update, context)
+                anyAI_reply = anyAI_response(update, context)
                 context.bot.send_message(
                     chat_id=update.effective_chat.id,
                     text=fresed_reply, parse_mode=telegram.ParseMode.MARKDOWN)
                 context.user_data["messages"].append({
                     "role": "assistant",
-                    "content": fresed_reply
+                    "content": anyAI_reply
                 })        
                 return
 
         # Handle image messages
         elif message.photo:
-            model = context.user_data.get("model", "gpt-4o")
-            if model not in ["gpt-4-turbo", "gpt-4o"]:
+            model = context.user_data.get("model", "gpt-4o-mini")
+            if model not in ["gpt-4-turbo", "gpt-4o-mini"]:
                 context.bot.send_message(
                     chat_id=update.effective_chat.id,
                     text="Your chosen model does not support images as input. Please send a text message or switch models from /settings.",
