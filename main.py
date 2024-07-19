@@ -63,7 +63,7 @@ def start(update, context):
 
 def settings(update, context):
     """Shows current settings and sends inline keyboard buttons to choose settings to modify."""
-    model = context.user_data.get("model", "Default - gpt-4o")
+    model = context.user_data.get("model", "Default - gpt-4o-mini")
     quality = context.user_data.get("quality", "standard")
     sys_prompt = context.user_data.get("sys_prompt", "Default")
 
@@ -106,14 +106,14 @@ def settings_callback(update, context):
         context.user_data["awaiting_sys_prompt"] = True
     elif setting == "default_model":
         keyboard = [
-            [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o-mini")],
+            [InlineKeyboardButton("GPT-4o-mini", callback_data="gpt-4o-mini")],
             [InlineKeyboardButton("Llama3-70b", callback_data="llama-3-70b-instruct")],
             [InlineKeyboardButton("Llama3-8b", callback_data="llama-3-8b-instruct")],
             [InlineKeyboardButton("Llama3-70b Online", callback_data="llama-3-sonar-large-32k-online")],
             [InlineKeyboardButton("Llama3-8b Online", callback_data="llama-3-sonar-small-32k-online")],
             [InlineKeyboardButton("Mixtral", callback_data="mixtral-8x7b-instruct")],
             [InlineKeyboardButton("Any Uncensored", callback_data="any-uncensored")],
-            [InlineKeyboardButton("Claude 3 Opus", callback_data="claude-3-opus")]
+            [InlineKeyboardButton("Claude 3.5 Sonnet", callback_data="claude-3-5-sonnet-20240620")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose default model for making requests:",
@@ -161,7 +161,7 @@ def anyAI_response(update, context):
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
     response = any_client.chat.completions.create(
-        model="claude-3.5-sonnet",
+        model="claude-3-5-sonnet-20240620",
         messages=messages.copy(),
         stream=False,
         max_tokens=4000
@@ -254,7 +254,7 @@ def respond_to_message(update, context):
                     "content": anyAI_reply
                 })        
                 return
-            elif model == "claude-3-opus":
+            elif model == "claude-3-5-sonnet-20240620":
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
                 anyAI_reply = anyAI_response(update, context)
@@ -436,7 +436,7 @@ dispatcher.add_handler(
                          pattern="^(standard|hd|sdxl)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
-                         pattern="^(gpt-4o|llama-3-70b-instruct|llama-3-8b-instruct|llama-3-sonar-large-32k-online|llama-3-sonar-small-32k-online|mixtral-8x7b-instruct|any-uncensored|claude-3-opus)$"))
+                         pattern="^(gpt-4o-mini|llama-3-70b-instruct|llama-3-8b-instruct|llama-3-sonar-large-32k-online|llama-3-sonar-small-32k-online|mixtral-8x7b-instruct|any-uncensored|claude-3-5-sonnet-20240620)$"))
 
 dispatcher.add_handler(
     MessageHandler(Filters.text | Filters.photo, respond_to_message, run_async=True))
