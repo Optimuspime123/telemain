@@ -21,7 +21,7 @@ from telegram.ext import (
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 pplx_client = OpenAI(base_url="https://api.perplexity.ai",api_key="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")
 oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
-any_client = OpenAI(api_key="meowmeow69",base_url="https://api.discord.rocks")
+any_client = OpenAI(api_key="abcd",base_url="https://api.discord.rocks")
 #fresed_client = OpenAI(base_url="https://fresedgpt.space/v1", api_key="fresed-aRxFAtH4C1u93VN0G7E59CaHw9L6V2")
 
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
