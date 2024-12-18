@@ -23,7 +23,7 @@ pplx_client = OpenAI(base_url="https://api.perplexity.ai",api_key="pplx-24be1a7b
 #oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
 
-any_client = OpenAI(api_key="abcd",base_url="https://api.discord.rocks")
+any_client = OpenAI(api_key="meowmeow69",base_url="https://api.airforce")
 #fresed_client = OpenAI(base_url="https://fresedgpt.space/v1", api_key="fresed-aRxFAtH4C1u93VN0G7E59CaHw9L6V2")
 
 updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
@@ -65,7 +65,7 @@ def start(update, context):
 
 def settings(update, context):
     """Shows current settings and sends inline keyboard buttons to choose settings to modify."""
-    model = context.user_data.get("model", "Default - gpt-4o-mini")
+    model = context.user_data.get("model", "Default - gpt-4o")
     quality = context.user_data.get("quality", "standard")
     sys_prompt = context.user_data.get("sys_prompt", "Default")
 
@@ -96,7 +96,7 @@ def settings_callback(update, context):
         ], [
             InlineKeyboardButton("DALL-E 3 - HD", callback_data="hd")
         ], [
-            InlineKeyboardButton("SDXL (base + refiner)", callback_data="sdxl")
+            InlineKeyboardButton("Flux", callback_data="flux")
         ]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose image generation quality:",
@@ -108,7 +108,7 @@ def settings_callback(update, context):
         context.user_data["awaiting_sys_prompt"] = True
     elif setting == "default_model":
         keyboard = [
-            [InlineKeyboardButton("GPT-4o-mini", callback_data="gpt-4o")],
+            [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],
             [InlineKeyboardButton("Llama3-70b", callback_data="llama-3-70b-instruct")],
             [InlineKeyboardButton("Llama3-8b", callback_data="llama-3-8b-instruct")],
             [InlineKeyboardButton("Llama3-70b Online", callback_data="llama-3-sonar-large-32k-online")],
@@ -329,19 +329,19 @@ def clear_history(update, context):
                              reply_to_message_id=update.message.message_id)
 
 
-def getSDXLimage(prompt):
-    """Generates an image using SDXL based on the provided prompt."""
+def getfluximage(prompt):
+    """Generates an image using flux based on the provided prompt."""
     try:
         url = f"https://api.airforce/imagine2?model=Flux&prompt={prompt}"
         response = requests.get(url)
         response.raise_for_status()
         return response.content
     except Exception as e:
-        raise RuntimeError(f"Failed to generate image with SDXL: {str(e)}")
+        raise RuntimeError(f"Failed to generate image with flux: {str(e)}")
 
 
 def generate_image(update, context):
-    """Generates an image using DALL-E 3 or SDXL based on the provided prompt."""
+    """Generates an image using DALL-E 3 or flux based on the provided prompt."""
     try:
         prompt = ' '.join(context.args)
         if not prompt:
@@ -360,8 +360,8 @@ def generate_image(update, context):
         # Get the selected quality from user data, default to "standard" if not set
         quality = context.user_data.get("quality", "standard")
 
-        if quality == "sdxl":
-            image_data = getSDXLimage(prompt)
+        if quality == "flux":
+            image_data = getfluximage(prompt)
             context.bot.delete_message(chat_id=update.effective_chat.id,
                                        message_id=placeholder_message.message_id)
             context.bot.send_photo(chat_id=update.effective_chat.id,
@@ -421,7 +421,7 @@ dispatcher.add_handler(
         pattern="^(generation_quality|system_prompt|default_model)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(generation_quality_callback,
-                         pattern="^(standard|hd|sdxl)$"))
+                         pattern="^(standard|hd|flux)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
                          pattern="^(gpt-4o-mini|llama-3-70b-instruct|llama-3-8b-instruct|llama-3-sonar-large-32k-online|llama-3-sonar-small-32k-online|mixtral-8x7b-instruct|any-uncensored|claude-3-5-sonnet-20240620)$"))
