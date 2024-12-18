@@ -143,7 +143,7 @@ def default_model_callback(update, context):
 
 def pplx_response(update, context):
     messages = context.user_data.get("messages", [])
-    model = context.user_data.get("model", "llama-3-8b-instruct")  # Retrieve model or use default
+    model = context.user_data.get("model", "llama-3.1-sonar-small-128k-online")  # Retrieve model or use default
     
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
@@ -231,7 +231,7 @@ def respond_to_message(update, context):
 
             # Check if the selected model is not gpt-4o and call pplx_response
             model = context.user_data.get("model", "gpt-4o")
-            if model in ["llama-3-8b-instruct", "llama-3-70b-instruct", "mixtral-8x7b-instruct", "llama-3-sonar-large-32k-online", "llama-3-sonar-small-32k-online"]:
+            if model in ["llama-3.1-sonar-large-128k-online", "llama-3.1-sonar-small-128k-online"]:
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
                 pplx_reply = pplx_response(update, context)
