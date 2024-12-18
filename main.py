@@ -148,15 +148,17 @@ def pplx_response(update, context):
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
     response = pplx_client.chat.completions.create(
-        model=model,  # Use the retrieved model
+        model=model,
         messages=messages.copy(),
         stream=False,
         max_tokens=2000
     )
     message_content = response.choices[0].message.content
 
-    # Extract citation URLs and format them
-    citation_urls = [citation["url"] for citation in response.citations]
+    # Extract citation URLs directly
+    citation_urls = response.citations  # This is already a list of URLs
+
+    # Format citation URLs for display
     if citation_urls:
         citation_text = "\n\nRead more at:\n" + "\n".join(
             [f"- {url}" for url in citation_urls]
@@ -168,6 +170,7 @@ def pplx_response(update, context):
     pplx_response_text = message_content + citation_text
 
     return pplx_response_text
+
 
 def anyAI_response(update, context):
     messages = context.user_data.get("messages", [])
