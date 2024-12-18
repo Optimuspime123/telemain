@@ -422,7 +422,7 @@ dispatcher.add_handler(
                          pattern="^(standard|hd|flux)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
-                         pattern="^(gpt-4o-mini|llama-3-70b-instruct|llama-3-8b-instruct|llama-3-sonar-large-32k-online|llama-3-sonar-small-32k-online|mixtral-8x7b-instruct|any-uncensored|claude-3-5-sonnet-20240620)$"))
+                         pattern="^(gpt-4o|llama-3.1-sonar-large-128k-online|llama-3.1-sonar-small-128k-online|mixtral-8x7b-instruct)$"))
 
 dispatcher.add_handler(
     MessageHandler(Filters.text | Filters.photo, respond_to_message, run_async=True))
