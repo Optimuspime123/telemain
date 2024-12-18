@@ -112,7 +112,7 @@ def settings_callback(update, context):
     elif setting == "default_model":
         keyboard = [
             [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],
-            [InlineKeyboardButton("Llama3.1-70b Online", callback_data="llama-3-sonar-large-128k-online")],
+            [InlineKeyboardButton("Llama3.1-70b Online", callback_data="llama-3.1-sonar-large-128k-online")],
             [InlineKeyboardButton("Llama3.1-8b Online", callback_data="llama-3.1-sonar-small-128k-online")],
             [InlineKeyboardButton("Mixtral - ⚠", callback_data="mixtral-8x7b-instruct")]
         ]
