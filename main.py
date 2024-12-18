@@ -143,7 +143,7 @@ def default_model_callback(update, context):
 
 def pplx_response(update, context):
     messages = context.user_data.get("messages", [])
-    model = context.user_data.get("model", "llama-3.1-sonar-small-128k-online")  # Retrieve model or use default
+    model = context.user_data.get("llama-3.1-sonar-small-128k-online")  # Retrieve model or use default
     
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
@@ -218,16 +218,25 @@ def respond_to_message(update, context):
 
         # Handle text messages
         if message.text:
-            if message.text.startswith("/web "):
-                update.message.reply_text(
-                    "This command is deprecated, please switch to one of the online models from /settings for better web-powered responses.",
-                    reply_to_message_id=update.message.message_id)
-                return
-
             context.user_data["messages"].append({
                 "role": "user",
                 "content": message.text
             })
+            
+            if message.text.startswith("/web "):
+                context.bot.send_chat_action(chat_id=update.effective_chat.id,
+                                             action=ChatAction.TYPING)
+                pplx_reply = pplx_response(update, context)
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=pplx_reply, parse_mode=telegram.ParseMode.MARKDOWN)
+                context.user_data["messages"].append({
+                    "role": "assistant",
+                    "content": pplx_reply
+                })        
+                return
+
+            
 
             # Check if the selected model is not gpt-4o and call pplx_response
             model = context.user_data.get("model", "gpt-4o")
