@@ -153,8 +153,21 @@ def pplx_response(update, context):
         stream=False,
         max_tokens=2000
     )
-    
-    return response.choices[0].message.content
+    message_content = response.choices[0].message.content
+
+    # Extract citation URLs and format them
+    citation_urls = [citation["url"] for citation in response.citations]
+    if citation_urls:
+        citation_text = "\n\nRead more at:\n" + "\n".join(
+            [f"- {url}" for url in citation_urls]
+        )
+    else:
+        citation_text = ""
+
+    # Combine the message content and citation links
+    pplx_response_text = message_content + citation_text
+
+    return pplx_response_text
 
 def anyAI_response(update, context):
     messages = context.user_data.get("messages", [])
