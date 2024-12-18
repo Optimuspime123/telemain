@@ -143,7 +143,7 @@ def default_model_callback(update, context):
 
 def pplx_response(update, context):
     messages = context.user_data.get("messages", [])
-    model = context.user_data.get("llama-3.1-sonar-small-128k-online")  # Retrieve model or use default
+    model = "llama-3.1-sonar-small-128k-online"  # Retrieve model or use default
     
     context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
     
