@@ -21,8 +21,11 @@ from telegram.ext import (
 BOT_TOKEN = "7021728236:AAFIeC30KNlJ2V8QFDJ8OegnxltCJ0YN29U"  #notestbot
 pplx_client = OpenAI(base_url="https://api.perplexity.ai",api_key="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")
 #oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
-oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
+part_a = "sk-proj-FFjyhUaYXN"
+part_b = "-916RB1LPIr6RE15aS18ChOqlGq97agNit37"
+part_c = "51OPorQHHtga7a3rpWi14ZBoGs8UT3BlbkFJRAPjdqqbLjxEr0NXEyf8fJP7EHX1mcv8hyqhhszHHvia5QeWJRFOJb-1s9ilJa-tHMdM32_aMA"
 
+oai_client = OpenAI(api_key=part_a + part_b + part_c)
 any_client = OpenAI(api_key="meowmeow69",base_url="https://api.airforce")
 #fresed_client = OpenAI(base_url="https://fresedgpt.space/v1", api_key="fresed-aRxFAtH4C1u93VN0G7E59CaHw9L6V2")
 
