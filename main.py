@@ -114,7 +114,7 @@ def settings_callback(update, context):
             [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],
             [InlineKeyboardButton("Llama3.1-70b Online", callback_data="llama-3.1-sonar-large-128k-online")],
             [InlineKeyboardButton("Llama3.1-8b Online", callback_data="llama-3.1-sonar-small-128k-online")],
-            [InlineKeyboardButton("Mixtral - ⚠", callback_data="mixtral-8x7b-instruct")]
+            [InlineKeyboardButton("Mistral-Large", callback_data="mistral-large")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         query.edit_message_text("Choose default model for making requests:",
@@ -185,6 +185,37 @@ def anyAI_response(update, context):
     )
     
     return response.choices[0].message.content
+
+def mistral_response(update, context):
+    """Handles message requests to Mistral API."""
+    messages = context.user_data.get("messages", [])
+    
+    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+    
+    headers = {
+        "Authorization": "Bearer uFbfsK7AWnm0zEF0JybXmT4VxX5a1SqL",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "messages": messages.copy(),
+        "max_tokens": 8192,
+        "temperature": 0.7
+    }
+    
+    try:
+        response = requests.post(
+            "https://mistral-large-ezoml.swedencentral.models.ai.azure.com/v1/chat/completions",
+            headers=headers,
+            json=payload
+        )
+        response.raise_for_status()
+        response_data = response.json()
+        return response_data["choices"][0]["message"]["content"]
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Error making request to Mistral API: {str(e)}")
+        raise
 
 
 def respond_to_message(update, context):
@@ -267,7 +298,7 @@ def respond_to_message(update, context):
                     "role": "assistant",
                     "content": pplx_reply
                 })        
-                return
+                return    
             elif model == "claude-3-5-sonnet-20240620":
                 context.bot.send_chat_action(chat_id=update.effective_chat.id,
                                              action=ChatAction.TYPING)
@@ -280,7 +311,19 @@ def respond_to_message(update, context):
                     "content": anyAI_reply
                 })        
                 return
-
+            elif model == "mistral-large":
+                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
+                mistral_reply = mistral_response(update, context)
+                context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=mistral_reply, 
+                    parse_mode=telegram.ParseMode.MARKDOWN)
+                context.user_data["messages"].append({
+                    "role": "assistant",
+                    "content": mistral_reply
+                })        
+                return    
+            
         # Handle image messages
         elif message.photo:
             model = context.user_data.get("model", "gpt-4o")
@@ -450,7 +493,7 @@ dispatcher.add_handler(
                          pattern="^(standard|hd|flux)$"))
 dispatcher.add_handler(
     CallbackQueryHandler(default_model_callback,
-                         pattern="^(gpt-4o|llama-3.1-sonar-large-128k-online|llama-3.1-sonar-small-128k-online|mixtral-8x7b-instruct)$"))
+                         pattern="^(gpt-4o|llama-3.1-sonar-large-128k-online|llama-3.1-sonar-small-128k-online|mistral-large)$"))
 
 dispatcher.add_handler(
     MessageHandler(Filters.text | Filters.photo, respond_to_message, run_async=True))
