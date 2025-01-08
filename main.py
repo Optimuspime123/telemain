@@ -1,509 +1,727 @@
+from user_data_manager import (add_user,removePremium ,update_credits,update_hasreferred,delete_user,get_database,get_format_database, check_user, update_subscription_topremium,add_credits,  add_group, edit_group, add_member_to_group, remove_member_from_group, check_group_members, is_user_admin)
+from chatgptpro import (test_openai_key,generate_image,clear_session)
+from concurrent.futures import ThreadPoolExecutor
+import telebot
 import os
-os.system("pip uninstall telegram")
-os.system("pip install python-telegram-bot==13.2")
-import base64
-import re
+from io import BytesIO
 import time
-import urllib3
+import threading
+from collections import defaultdict
+from threading import Thread,Event
+from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
+from telebot import types
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
 import requests
-import json
-import telegram
-from openai import OpenAI
-from telegram import ChatAction, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    CallbackQueryHandler,
-    CommandHandler,
-    Filters,
-    MessageHandler,
-    Updater,
-)
+from telebot.apihelper import ApiTelegramException
+from usersettingmanager import(load_chat_model,load_custom_system_prompt,load_image_quality,change_chat_model,change_custom_prompt,change_image_quality)
 
-BOT_TOKEN = "jPnTA"  #notestbot
-pplx_client = OpenAI(api_key="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",base_url="https://api.perplexity.ai",)
-#oai_client = OpenAI(api_key="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",base_url="https://gateway.ai.cloudflare.com/v1/862c59c85be413ee9a09c1b8a84c59ba/optimus/openai")
-part_a = "sk-proj-FFjyhUaYXN"
-part_b = "-916RB1LPIr6RE15aS18ChOqlGq97agNit37"
-part_c = "51OPorQHHtga7a3rpWi14ZBoGs8UT3BlbkFJRAPjdqqbLjxEr0NXEyf8fJP7EHX1mcv8hyqhhszHHvia5QeWJRFOJb-1s9ilJa-tHMdM32_aMA"
+catmaxfuryuserid = 6975177248
+USER_DATA_FILE = 'user_data.json'
 
-oai_client = OpenAI(api_key=part_a + part_b + part_c)
-any_client = OpenAI(api_key="meowmeow69",base_url="https://api.airforce")
-#fresed_client = OpenAI(base_url="https://fresedgpt.space/v1", api_key="fresed-aRxFAtH4C1u93VN0G7E59CaHw9L6V2")
+# Global variables
 
-updater = Updater(token=BOT_TOKEN, use_context=True, workers=12)
-dispatcher = updater.dispatcher
+user_states = {}  # To keep track of user navigation
+user_locks = defaultdict(threading.Lock)  # Dictionary to track user locks
+pending_messages = []  # List to store multiple messages
+user_ids = []  # This should be populated based on your audience logic
 
 
-def encode_image(image_path):
-    """Encodes an image to base64 string."""
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+# Initialize the bot with your token
+TELEGRAM_BOT_TOKEN = '7021728236:AAFz9JMyEYihmesN70RCg7bQBmVIF3jPnTA' #Test
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+# Create a ThreadPoolExecutor with a limit on the number of concurrent threads
+executor = ThreadPoolExecutor(max_workers=40)  # Adjust the number of workers as needed
+lock = threading.Lock()
 
+def parse_command(text):
+    """Parse the command from the message text, supporting both / and . prefixes."""
+    if text.startswith('/') or text.startswith('.'):
+        command_parts = text.split()
+        command_with_mention = command_parts[0]
 
-def start(update, context):
-    """Sends welcome message and image on /start command."""
-    user = update.effective_user
-    welcome_message = f"👋 Hi {user.first_name}, welcome to Cogify, an advanced AI-bot powered by GPT-4o and DALL·E 3! 🤖✨\n \n 💬 Send me a message to get started! I'm happy to chat, answer questions, help with analysis and writing tasks, and more.\n \n 🖼️ Type '/img [your prompt]' to generate images using DALL·E 3. For example: /img a majestic lion on the African savanna at sunset, digital art \n \n 🏞️ Send any image and I'll use GPT-4 with computer vision to analyze and discuss it with you.\n \n 🧹 If you ever want to clear our conversation history and start fresh, just type '/clear' \n\n Start a prompt with /web to get responses from web-enabled llama3.1 by perplexity \n\n Use /settings to change bot settings. \n\n ℹ️ Learn more about what I can do at https://cogify.social \n "
-
-    try:
-        context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                     action=ChatAction.TYPING)
-    except Exception as e:
-        print(
-            f"Error occurred while sending chat action: {str(e)}. Retrying in 2 seconds..."
-        )
-        time.sleep(2)
-        try:
-            context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                         action=ChatAction.TYPING)
-        except Exception as e:
-            print(
-                f"Error occurred again while sending chat action: {str(e)}. Skipping."
-            )
-    context.bot.send_photo(
-        chat_id=update.effective_chat.id,
-        photo="https://graph.org/file/fd41b5e034a27cc4d65b6.jpg",
-        caption=welcome_message,
-        reply_to_message_id=update.message.message_id)
-
-
-def settings(update, context):
-    """Shows current settings and sends inline keyboard buttons to choose settings to modify."""
-    model = context.user_data.get("model", "Default - gpt-4o")
-    quality = context.user_data.get("quality", "standard")
-    sys_prompt = context.user_data.get("sys_prompt", "Default")
-
-    current_settings = f"Current settings:\n\n🤖 Default model: {model}\n🖼️ Generation quality: {quality}\n✨ System prompt: {sys_prompt}\n"
-
-    keyboard = [[
-        InlineKeyboardButton(" 🖼️ Generation quality",
-                             callback_data="generation_quality")
-    ], [
-        InlineKeyboardButton("✨ System prompt", callback_data="system_prompt")
-    ], [
-        InlineKeyboardButton(" 🤖Default model", callback_data="default_model")
-    ]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text(current_settings + "Choose which setting you wish to modify:",
-                              reply_markup=reply_markup,
-                              reply_to_message_id=update.message.message_id)
-
-
-def settings_callback(update, context):
-    """Handles the settings callback and updates the respective setting."""
-    query = update.callback_query
-    setting = query.data
-
-    if setting == "generation_quality":
-        keyboard = [[
-            InlineKeyboardButton("DALL-E 3 - Standard", callback_data="standard")
-        ], [
-            InlineKeyboardButton("DALL-E 3 - HD", callback_data="hd")
-        ], [
-            InlineKeyboardButton("Flux", callback_data="flux")
-        ]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        query.edit_message_text("Choose image generation quality:",
-                                reply_markup=reply_markup)
-    elif setting == "system_prompt":
-        query.edit_message_text(
-            "Send your custom system prompt and remember to /clear conversation history for the changes to take effect!"
-        )
-        context.user_data["awaiting_sys_prompt"] = True
-    elif setting == "default_model":
-        keyboard = [
-            [InlineKeyboardButton("GPT-4o", callback_data="gpt-4o")],
-            [InlineKeyboardButton("Llama3.1-70b Online", callback_data="llama-3.1-sonar-large-128k-online")],
-            [InlineKeyboardButton("Llama3.1-8b Online", callback_data="llama-3.1-sonar-small-128k-online")],
-            [InlineKeyboardButton("Mistral-Large", callback_data="mistral-large")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        query.edit_message_text("Choose default model for making requests:",
-                                reply_markup=reply_markup)
-
-    query.answer()
-
-
-def generation_quality_callback(update, context):
-    """Handles the generation quality callback and stores the chosen quality."""
-    query = update.callback_query
-    quality = query.data
-    context.user_data["quality"] = quality
-    query.answer()
-    query.edit_message_text(f"Image generation quality set to: {quality}")
-
-
-def default_model_callback(update, context):
-    """Handles the default model callback and stores the chosen model."""
-    query = update.callback_query
-    model = query.data
-    context.user_data["model"] = model
-    query.answer()
-    query.edit_message_text(f"Default model set to: {model}")
-
-
-def pplx_response(update, context):
-    messages = context.user_data.get("messages", [])
-    model = "llama-3.1-sonar-small-128k-online"  # Retrieve model or use default
-    
-    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    
-    response = pplx_client.chat.completions.create(
-        model=model,
-        messages=messages.copy(),
-        stream=False,
-        max_tokens=2000
-    )
-    message_content = response.choices[0].message.content
-
-    # Extract citation URLs directly
-    citation_urls = response.citations  # This is already a list of URLs
-
-    # Format citation URLs for display
-    if citation_urls:
-        citation_text = "\n\nRead more at:\n" + "\n".join(
-            [f"- {url}" for url in citation_urls]
-        )
-    else:
-        citation_text = ""
-
-    # Combine the message content and citation links
-    pplx_response_text = message_content + citation_text
-
-    return pplx_response_text
-
-
-def anyAI_response(update, context):
-    messages = context.user_data.get("messages", [])
-    
-    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    
-    response = any_client.chat.completions.create(
-        model="claude-3-5-sonnet-20240620",
-        messages=messages.copy(),
-        stream=False,
-        max_tokens=4000
-    )
-    
-    return response.choices[0].message.content
-
-def mistral_response(update, context):
-    """Handles message requests to Mistral API."""
-    messages = context.user_data.get("messages", [])
-    
-    context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-    
-    headers = {
-        "Authorization": "Bearer uFbfsK7AWnm0zEF0JybXmT4VxX5a1SqL",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "messages": messages.copy(),
-        "max_tokens": 8192,
-        "temperature": 0.7
-    }
-    
-    try:
-        response = requests.post(
-            "https://mistral-large-ezoml.swedencentral.models.ai.azure.com/v1/chat/completions",
-            headers=headers,
-            json=payload
-        )
-        response.raise_for_status()
-        response_data = response.json()
-        return response_data["choices"][0]["message"]["content"]
+        if '@coolcatpoolbot' in command_with_mention:
+            command = command_with_mention.split('@')[0][1:]
+            return command
         
-    except requests.exceptions.RequestException as e:
-        print(f"Error making request to Mistral API: {str(e)}")
-        raise
+        command = text.split()[0][1:]  # Remove the leading / or .
+        return command.lower()
+
+    return None
 
 
-def respond_to_message(update, context):
-    """Handles user text and image messages, sends for inference."""
-    try:
-        user = update.effective_user
-        message = update.message
-        sanitized_name = re.sub(r'[^a-zA-Z0-9]', '', user.first_name or ' ')
+def custom(message):
+    user_id = message.from_user.id
+    # Check if the message starts with /custom and slice off that part
+    if message.text.startswith('/custom'):
+        custom_text = message.text[len('/custom '):]  # Slice off "/custom " (with space)
+        change_custom_prompt(user_id,custom_text)
+        bot.send_message(message.chat.id, f"Your custom prompt is: {custom_text}")
+    else:
+        bot.send_message(message.chat.id, "Please use the correct format: /custom {Your Prompt Here}")
 
-        # Check if the user is awaiting a system prompt
-        if context.user_data.get("awaiting_sys_prompt"):
-            context.user_data["sys_prompt"] = message.text
-            context.user_data["awaiting_sys_prompt"] = False
-            update.message.reply_text(
-                "System prompt set. Remember to /clear conversation history for the changes to take effect.",
-                reply_to_message_id=update.message.message_id)
+
+pending_message = None
+user_ids = []
+
+
+def register_message(message):
+    # Create a button to register
+    markup = types.InlineKeyboardMarkup()
+    register_button = types.InlineKeyboardButton("Register", url=f"https://t.me/{bot.get_me().username}?start")
+    markup.add(register_button)
+
+    busy_message = bot.reply_to(message, 
+         "You are not registered. Please register yourself in private chat first.\n Auto Deleting this message in (15sec)",
+          reply_markup=markup)
+
+    # Store the message info and set a timer to delete it after 10 seconds
+    busy_message_info = (busy_message.chat.id, busy_message.message_id)
+    threading.Timer(15, lambda: bot.delete_message(busy_message_info[0], busy_message_info[1]) if busy_message_info else None).start()
+
+# Command handler for /start
+
+# Command handler for /start
+def handle_start(message):
+    referrer_id = message.text.split()[1][4:] if len(message.text.split()) > 1 and message.text.startswith('/start ref_') else None
+    user_id = message.from_user.id
+    first_name = message.from_user.full_name
+    username = message.from_user.username
+    chat_id = message.chat.id
+    dev1 = '<a href="https://t.me/catmaxfury">CatMaxFury</a>'
+    dev2 = '<a href="https://t.me/Shubhamsharmaui">Shubham Sharma</a>'
+    user_data = check_user(user_id)
+    if message.chat.type in ['group', 'supergroup']:
+        if not user_data:
+            register_message(message)
             return
-
-        # Store message history with initial system message
-        if "messages" not in context.user_data:
-            context.user_data["messages"] = []
-
-        # Check if a message with the role "system" already exists
-        system_prompt_exists = any(msg["role"] == "system"
-                                   for msg in context.user_data["messages"])
-
-        if not system_prompt_exists:
-            # Append the system prompt if it doesn't exist
-            system_prompt = context.user_data.get(
-                "sys_prompt",
-                f"You are Cogify, an advanced Telegram AI bot built to help users. You can process text (and image inputs using the GPT-4o model), and can generate images using DALL-E3 - command is /img "
-                "{prompt}"
-                ". Be friendly and helpful!  to clear conversation history user should send /clear. To choose settings and change AI Model used they can send /settings . To get results from the internet they can use /web {query}  "
-            )
-            context.user_data["messages"].append({
-                "role": "system",
-                "content": system_prompt
-            })
-
-        # Check the number of characters in the messages array
-        total_characters = sum(
-            len(msg["content"]) for msg in context.user_data["messages"])
-
-        # If the total characters exceed 60,000, clear the messages array
-        if total_characters > 20000:
-            context.user_data["messages"] = []
-
-        # Handle text messages
-        if message.text:
-            context.user_data["messages"].append({
-                "role": "user",
-                "content": message.text
-            })
-            
-            if message.text.startswith("/web "):
-                context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                             action=ChatAction.TYPING)
-                pplx_reply = pplx_response(update, context)
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=pplx_reply, parse_mode=telegram.ParseMode.MARKDOWN)
-                context.user_data["messages"].append({
-                    "role": "assistant",
-                    "content": pplx_reply
-                })        
-                return
-
-            
-
-            # Check if the selected model is not gpt-4o and call pplx_response
-            model = context.user_data.get("model", "gpt-4o")
-            if model in ["llama-3.1-sonar-large-128k-online", "llama-3.1-sonar-small-128k-online"]:
-                context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                             action=ChatAction.TYPING)
-                pplx_reply = pplx_response(update, context)
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=pplx_reply, parse_mode=telegram.ParseMode.MARKDOWN)
-                context.user_data["messages"].append({
-                    "role": "assistant",
-                    "content": pplx_reply
-                })        
-                return    
-            elif model == "claude-3-5-sonnet-20240620":
-                context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                             action=ChatAction.TYPING)
-                anyAI_reply = anyAI_response(update, context)
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=anyAI_reply, parse_mode=telegram.ParseMode.MARKDOWN)
-                context.user_data["messages"].append({
-                    "role": "assistant",
-                    "content": anyAI_reply
-                })        
-                return
-            elif model == "mistral-large":
-                context.bot.send_chat_action(chat_id=update.effective_chat.id, action=ChatAction.TYPING)
-                mistral_reply = mistral_response(update, context)
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=mistral_reply, 
-                    parse_mode=telegram.ParseMode.MARKDOWN)
-                context.user_data["messages"].append({
-                    "role": "assistant",
-                    "content": mistral_reply
-                })        
-                return    
-            
-        # Handle image messages
-        elif message.photo:
-            model = context.user_data.get("model", "gpt-4o")
-            if model not in ["gpt-4-turbo", "gpt-4o"]:
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text="Your chosen model does not support images as input. Please send a text message or switch models from /settings.",
-                    reply_to_message_id=update.message.message_id
-                )
-                return
-            # Download the largest photo size
-            file_id = message.photo[-1].file_id
-            newFile = context.bot.get_file(file_id)
-            newFile.download('temp_image.jpg')
-
-            # Encode the image to base64
-            base64_image = encode_image('temp_image.jpg')
-            os.remove('temp_image.jpg')  # Clean up the temporary image file
-
-            context.user_data["messages"].append({
-                "role": "user",
-                "content": [{
-                    "type": "text",
-                    "text": message.caption or "User has uploaded this image: "
-                }, {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}"
-                    }
-                }]
-            })
-
-        # Send placeholder message
-        placeholder_message = context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Please wait... this can take a while",
-            reply_to_message_id=update.message.message_id)
-        context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                     action=ChatAction.TYPING)
-
-        messages = context.user_data["messages"]
-
-        # Get the selected model from user data, default to "gpt-4o" if not set
-        model = context.user_data.get("model", "gpt-4o")
-        response = oai_client.chat.completions.create(model=model,
-                                                      messages=messages.copy(),
-                                                      max_tokens=2024,
-                                                      stream=False)
-
-        context.bot.edit_message_text(
-            chat_id=update.effective_chat.id,
-            message_id=placeholder_message.message_id,
-            text=response.choices[0].message.content,
-            parse_mode=telegram.ParseMode.MARKDOWN)
-        #print(response.choices[0].message.content)
-        # Store assistant's response
-        context.user_data["messages"].append({
-            "role": "assistant",
-            "content": response.choices[0].message.content
-        })
-
-    except Exception as e:
-        context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text=f"Sorry, An error occurred: {str(e)}. You can try to switch to a different model from /settings.")
-
-
-def clear_history(update, context):
-    """Clears the message history for the user."""
-    context.user_data["messages"] = []
-    context.bot.send_message(chat_id=update.effective_chat.id,
-                             text="Conversation history has been cleared.",
-                             reply_to_message_id=update.message.message_id)
-
-
-def getfluximage(prompt):
-    """Generates an image using flux based on the provided prompt."""
-    try:
-        url = f"https://api.airforce/imagine2?model=Flux&prompt={prompt}"
-        response = requests.get(url)
-        response.raise_for_status()
-        return response.content
-    except Exception as e:
-        raise RuntimeError(f"Failed to generate image with flux: {str(e)}")
-
-
-def generate_image(update, context):
-    """Generates an image using DALL-E 3 or flux based on the provided prompt."""
-    try:
-        prompt = ' '.join(context.args)
-        if not prompt:
-            context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="Please provide a prompt after the /img command.")
-            return
-
-        placeholder_message = context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Generating image... this can take a while",
-            reply_to_message_id=update.message.message_id)
-        context.bot.send_chat_action(chat_id=update.effective_chat.id,
-                                     action=ChatAction.UPLOAD_PHOTO)
-
-        # Get the selected quality from user data, default to "standard" if not set
-        quality = context.user_data.get("quality", "standard")
-
-        if quality == "flux":
-            image_data = getfluximage(prompt)
-            context.bot.delete_message(chat_id=update.effective_chat.id,
-                                       message_id=placeholder_message.message_id)
-            context.bot.send_photo(chat_id=update.effective_chat.id,
-                                   photo=image_data,
-                                   caption=prompt,
-                                   reply_to_message_id=update.message.message_id)
+    
+    if user_data:
+        # If user exists, display their current data
+        subscription = user_data.get('subscription')
+        credits = user_data.get('credits')
+        refer_line = ''
+        if subscription != "Premium":
+         if referrer_id is not None:
+            if user_data.get('used_referrence'):
+               refer_line = "You have already redeemed using referal code\n\n"
+            else:
+               update_referrer = check_user(referrer_id)
+               if update_referrer:
+                  if update_referrer.get('subscription') != "Premium":
+                    add_credits(referrer_id,30)
+                    add_credits(user_id,30)
+                    update_hasreferred(user_id,referrer_id)
+                    
+        if subscription == "Gold":
+           credits_line = f"<b>💰 Credits</b> --> <code>{credits}</code>\n"
+        elif subscription == "Admin" or user_id == 1384248924:
+            subscription = "Owner"
+            credits_line = ''
         else:
-            response = oai_client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size="1024x1024",
-                quality=quality,
-                n=1,
-            )
+            credits_line = ''
+            
+        response = (
+        f"{refer_line}"
+        f"🎉Welcome back <a href=\"tg://user?id={user_id}\"><b>{first_name}</b></a>! 🤖to the Cogify Bot!\n\n"
+        f"<b>Subscription</b>:  <b>(🌟 {subscription})</b>\n\n"
+        f"{credits_line}"
+        "<b>📜 To view all available commands and their usage, type:</b> /help\n\n"
+        f"<b>📩 For any issues, inquiries or purchases, contact:</b> {dev1}\n\n"
+        f"<b>👨‍💻 Developers: </b>{dev1} & {dev2}\n"
+        "<b>💖 Thank you for using this bot!</b>"
+        )
+        response += "\n(You are already registered.)"
+    else:
+        credits_line = ''
+        # If user does not exist, register them and display the registration message
+        if referrer_id is not None:      
+            credits = 30,  # New user receives 10 credits
+            # Credit the referrer only if referrer_id is valid
+            checkreferenceid = check_user(referrer_id)
+            if checkreferenceid:
+                if checkreferenceid.get('subscription') != "Premium":
+                    add_credits(referrer_id,30) # Referrer receives 30 credits
+                    credits_line = "You joined using a referral link! You've earned 10 credits.Refer your code and earn more!!"
+                    has_referred = True
+                    credits = 30   
+                    subscription = "Gold"  
+                    credits_line = f"<b>💰 Credits</b> --> <code>{credits}</code>\n"
+            else:
+                has_referred = False
+                credits = 0  
+                subscription = "FreeUser"  
+                bot.reply_to(message, "You joined but the referrer ID is invalid.")               
+        else:
+            has_referred = False
+            subscription = "Premium"
+            credits = 0
+        add_user(user_id, first_name, credits, subscription, username,referrer_id,has_referred)
+        response = (
+        f"Hello <a href=\"tg://user?id={user_id}\"><b>{first_name}</b></a>! 🤖\n\n"
+        f"<b>Subscription</b>:  <b>(🌟 {subscription})</b>\n"
+        f"{credits_line}"
+        "<b>🎉 Welcome to the Cogify Bot!</b> 🚀\n\n"
+        "<i>Thank you for starting the bot.🙏</i>\n\n"
+        "<b>📜 To view all available commands and their usage, type:</b> /help\n\n"
+        f"<b>📩 For any issues, inquiries or purchases, contact:</b> {dev1}\n\n"
+        f"<b>👨‍💻 Developers: </b>{dev1} & {dev2}\n"
+        "<b>💖 Thank you for using this bot!</b>\n"
+        )
+        response += "You are now registered."
+     
+    if message.chat.type in ['group', 'supergroup']:
+          response += "\n\n Deleting this message in 10 Seconds to prevent group spam.. You can see the message in prvt."   
+    busy_message = bot.reply_to(message,response,parse_mode = "HTML")
+    if message.chat.type in ['group', 'supergroup']:
+          busy_message_info = (busy_message.chat.id, busy_message.message_id)
+          threading.Timer(10, lambda: bot.delete_message(busy_message_info[0], busy_message_info[1]) if busy_message_info else None).start()
+    
+       
+def typing_animation(chat_id, message_id, stop_event):
+    """Function to simulate typing animation."""
+    messages = [
+        "Typing",
+        "Typing.",
+        "Typing..",
+        "Typing...",
+        "Typing...."
+    ]
+    while not stop_event.is_set():
+        for msg in messages:
+            if stop_event.is_set():
+                break
+            try:
+                bot.edit_message_text(msg, chat_id, message_id)
+                time.sleep(0.5)  # Adjust the speed of the animation
+            except Exception as e:
+                break
 
-            image_url = response.data[0].url
-            context.bot.delete_message(chat_id=update.effective_chat.id,
-                                       message_id=placeholder_message.message_id)
-            context.bot.send_photo(chat_id=update.effective_chat.id,
-                                   photo=image_url,
-                                   caption=prompt,
-                                   reply_to_message_id=update.message.message_id)
-    except Exception as e:
-        context.bot.send_message(chat_id=update.effective_chat.id,
-                                 text=f"An error occurred: {str(e)}")
-
-
-def report_error(exception):
-    error_message = f"Request error: {str(exception)}. Restarting the bot."
-    chat_id = "1218619440"
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": error_message}
+# Function to download an image from a URL
+def download_image(image_url):
     try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to send error report: {str(e)}")
+        response = requests.get(image_url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return BytesIO(response.content)  # Return image as a BytesIO object
+    except requests.RequestException as e:
+        return None
+    
+# Function for typing animation
+def gen_animation(chat_id, message_id, stop_event):
+    """Function to simulate typing animation."""
+    messages = [
+        "Generating image",
+        "Generating image.",
+        "Generating image..",
+        "Generating image...",
+        "Generating image...."
+    ]
+    while not stop_event.is_set():
+        for msg in messages:
+            if stop_event.is_set():
+                break
+            try:
+                bot.edit_message_text(msg, chat_id, message_id)
+                time.sleep(0.5)  # Adjust the speed of the animation
+            except Exception as e:
+                break
+
+# Command handler for /img
+def img(message):
+    user_id = message.from_user.id
+    user_data = check_user(user_id)
+    subscription = user_data.get('subscription')
+
+    # Ensure that the user is valid and that the command is being used in a valid context
+    if message.chat.type in ['group', 'supergroup']:
+        if not user_data:
+            # Register the user if necessary
+            register_message(message)
+            return
+    if subscription == "FreeUser":
+        bot.reply_to(message, "You need to buy premium to use this command. Please purchase a premium subscription.")
+        return
+    
+    # Initialize a lock for the user (prevent concurrent processing)
+    user_lock = user_locks.setdefault(user_id, threading.Lock())
+
+    try:
+        # Try to acquire the lock (non-blocking)
+        if not user_lock.acquire(blocking=False):
+            # Notify the user that their previous command is still processing
+            busy_message = bot.reply_to(message, "Your previous command is processing. Please wait.")
+            threading.Timer(5, lambda: bot.delete_message(busy_message.chat.id, busy_message.message_id)).start()
+            return
+        
+        # Extract the prompt for the image from the user's message
+        prompt = message.text[len("/img "):].strip()  # Remove '/image ' from the start of the message
+
+        # If no prompt is provided, inform the user
+        if not prompt:
+            bot.reply_to(message, "Please provide a prompt for the image. Example: /img A beautiful sunset")
+            return
+        
+        # Notify the user that the image generation is in progress
+        waiting_message = bot.send_message(message.chat.id, "Generating image...")
+        gen_model = load_image_quality(user_id)
+        # Start the typing animation in the background
+        stop_event = threading.Event()
+        animation_thread = threading.Thread(target=gen_animation, args=(message.chat.id, waiting_message.message_id, stop_event))
+        animation_thread.start()
+        # Generate the image using the prompt
+        image_url = generate_image(user_id,prompt)
+
+        # bot.send_photo(message.chat.id,photo=image_url,caption=prompt)
+
+        # Stop the animation once the image is ready
+        stop_event.set()
+        
+
+        # If there is an error in the image generation
+        if "error" in image_url:
+            bot.send_message(message.chat.id, f"Error: {image_url}")
+        else:
+                # Download the image from the URL
+            image_data = download_image(image_url)
+            if image_data:
+
+                # Send the image back to the user
+                bot.send_photo(message.chat.id, image_data)
+            else:
+                bot.send_message(message.chat.id, f"Failed to download the image. Here is the URL: {image_url}")
+
+        # Delete the waiting message
+        bot.delete_message(message.chat.id, waiting_message.message_id)
+
+    except Exception as e:
+        bot.reply_to(message, f"An error occurred: {e}")
+    finally:
+        user_lock.release()  # Ensure the lock is released after processing
 
 
-def no_generate_image(update, context):
-    """Informs the user that image generation is unavailable."""
-    context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Image generation is currently unavailable for this bot. Try it out at https://cogify.social/image",
-        reply_to_message_id=update.message.message_id
+#Command Handler for /gpt4
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'gpt4')
+def gpt4(message):
+
+    user_id = message.from_user.id
+    user_data = check_user(user_id)
+
+    if message.chat.type in ['group', 'supergroup']:
+        if not user_data:
+            register_message(message)
+            return
+
+    user_lock = user_locks[user_id]
+    
+    try:
+        if not user_lock.acquire(blocking=False):
+            # Start a timer to delete the busy message after 5 seconds
+            busy_message = bot.reply_to(message, "Your previous command is processing. Please wait.")
+            threading.Timer(5, lambda: bot.delete_message(busy_message.chat.id, busy_message.message_id)).start()
+            return
+
+        full_text = message.text
+        rest_message = ""
+        
+        # Handle reply message (when someone tags another person's message)
+        if message.reply_to_message:
+            if message.reply_to_message.text:
+                # If the reply contains text, extract and process it
+                replied_message = message.reply_to_message.text
+                rest_message = f"{replied_message}\n{full_text[len('/gpt4 '):].strip()}"
+
+            elif message.reply_to_message.document:
+                # If the reply is a document, handle the file content
+                file_id = message.reply_to_message.document.file_id
+                file_info = bot.get_file(file_id)
+                file_path = file_info.file_path
+                file = bot.download_file(file_path)
+
+                # Assuming the file is a text file, decode it
+                file_content = file.decode('utf-8')
+                rest_message = f"{file_content}\n{full_text[len('/gpt4 '):].strip()}"
+
+        user_message = full_text
+        rest_message += user_message
+
+        # Combine conversation context with the rest of the message
+        prompt = rest_message
+        typing_message = bot.send_message(message.chat.id, "Typing...")
+
+        stop_event = Event()  # Create an event to control the typing animation
+        animation_thread = Thread(target=typing_animation, args=(message.chat.id, typing_message.message_id, stop_event))
+        animation_thread.start()
+        response = test_openai_key(user_id,prompt)  # Send the prompt to GPT-4
+        stop_event.set()  # Signal the animation to stop
+        animation_thread.join()  # Wait for the thread to finish
+
+        # Send the response as a normal text message or a file
+        MAX_MESSAGE_LENGTH = 4096
+        if len(response) > MAX_MESSAGE_LENGTH:
+            with open('response.txt', 'w', encoding="utf-8") as file:
+                file.write(response)
+            
+            with open('response.txt', 'rb') as file:
+                bot.send_document(message.chat.id, file, caption="📄 The response is too lengthy for a message, so here it is as a file!")
+                bot.delete_message(message.chat.id, typing_message.message_id)
+                
+            os.remove('response.txt')  # Delete the file after sending
+        else:
+            # Send the response as a normal text message
+            bot.edit_message_text(response, message.chat.id, typing_message.message_id, parse_mode='Markdown')
+
+    except Exception as e:
+        stop_event.set()  # Signal the animation to stop
+        animation_thread.join()  # Wait for the thread to finish
+        bot.edit_message_text( f"An error occurred: {e}",message.chat.id,typing_message.message_id,parse_mode='HTML')
+    finally:
+        user_lock.release()  # Ensure the lock is released after processing
+
+# Command handler for /clear
+def clear(message):
+    user_id = message.from_user.id
+    user_data = check_user(user_id)
+    if message.chat.type in ['group', 'supergroup']:
+        if not user_data:
+            register_message(message)
+            return
+    response = clear_session(user_id)
+    bot.send_message(user_id,response)
+
+
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'img')
+def start(message):
+    executor.submit(img, message)
+
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'clear')
+def start(message):
+    executor.submit(clear, message)
+
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'custom')
+def start(message):
+    executor.submit(custom, message)
+
+
+     
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'start')
+def start(message):
+    executor.submit(handle_start, message)
+    
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'help')
+def start(message):     
+    send_welcome(message.chat.id)
+
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'setting')
+def start(message):     
+    send_welcome(message.chat.id)
+
+
+@bot.message_handler(func=lambda message: parse_command(message.text) == 'settings')
+def start(message):     
+    send_welcome(message.chat.id)
+    
+    
+@bot.message_handler(func=lambda m: True)
+def process_message(message):
+    # Start handling messages in a separate thread
+    executor.submit(gpt4, message)
+
+
+# Callback query handler
+@bot.callback_query_handler(func=lambda call: True)
+def callback_query(call):
+    chat_id = call.message.chat.id
+    user_id = call.from_user.id 
+    message_id = call.message.message_id
+    markup = call.message.reply_markup  # This is where we get the inline keyboard
+    try:        
+        if call.data == 'close_help':
+            bot.delete_message(call.message.chat.id, call.message.message_id)  # Delete the message
+
+        if call.data == 'main_menu':
+            display_main_menu(chat_id, message_id)
+        elif call.data == 'back':
+            current_state = user_states.get(chat_id, {}).get("current")
+            if current_state == "tool_info":
+                # If coming back from tool info, check what tool was displayed
+                previous_state = user_states[chat_id]["previous"]
+                if previous_state == "Select Model":
+                    display_tool_info(chat_id, message_id, "Select Model",user_id)
+                elif previous_state == "Generation Quality":
+                    display_tool_info(chat_id, message_id, "Generation Quality",user_id)
+                elif previous_state == "Custom System Prompt":
+                    display_tool_info(chat_id, message_id, "Custom System Prompt",user_id)
+                elif previous_state == "Open AI Models":
+                    display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+                else:
+                    display_main_menu(chat_id, message_id)
+            else:
+                send_welcome(chat_id, message_id)
+
+        elif call.data == 'select_model':
+            user_states[chat_id]["previous"] = "main_menu"  # Set previous state before switching to Select Model
+            display_tool_info(chat_id, message_id, "Select Model",user_id)
+        elif call.data == 'open_ai_models':
+            user_states[chat_id]["previous"] = "Select Model"  # Update previous state before switching to Open AI Models
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'gemini_models':
+            user_states[chat_id]["previous"] = "Select Model"  # Update previous state before switching to Open AI Models
+            display_tool_info(chat_id, message_id, "Gemini Models",user_id)
+        elif call.data == 'claude_models':
+            user_states[chat_id]["previous"] = "Select Model"  # Update previous state before switching to Open AI Models
+            display_tool_info(chat_id, message_id, "Claude Models",user_id)
+        elif call.data == 'perplexity_models':
+            user_states[chat_id]["previous"] = "Select Model"  # Update previous state before switching to Open AI Models
+            display_tool_info(chat_id, message_id, "Perplexity Models",user_id)
+        elif call.data == 'gen_quality':
+            display_tool_info(chat_id, message_id, "Generation Quality",user_id)
+        elif call.data == 'custom_prompt':
+            display_tool_info(chat_id, message_id, "Custom System Prompt",user_id)
+
+        elif call.data == 'save_o1_preview': #o1_preview 
+            change_chat_model(user_id,"o1-preview")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_o1-mini': #o1 Mini
+            change_chat_model(user_id,"o1-mini")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_chatgpt_4o_latest': #CHATGPT 4o Latest  #'save_chatgpt_4o_latest'), #chatgpt-4o-latest
+            change_chat_model(user_id,"chatgpt-4o-latest") 
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_gpt_4': #GPT-4
+            change_chat_model(user_id,"gpt-4")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_gpt_4o': #GPT 4o 
+            change_chat_model(user_id,"gpt-4o")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_gpt_4o_mini': #GPT 4o Mini
+            change_chat_model(user_id,"gpt-4o-mini")  
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_gpt_4_turbo': #GPT-3.5-Turbo   
+            change_chat_model(user_id,"gpt-4-turbo")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_gpt_35_turbo': #GPT-3.5-Turbo  
+            change_chat_model(user_id,"gpt-3.5-turbo")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+
+            
+        elif call.data == 'save_gemini-2.0-flash-exp':   
+            change_chat_model(user_id,"gemini-2.0-flash-exp")
+            display_tool_info(chat_id, message_id, "Gemini Models",user_id)
+        elif call.data =='save_gemini-2.0-flash-thinking-exp-1219':
+            change_chat_model(user_id,"gemini-2.0-flash-thinking-exp-1219")
+            display_tool_info(chat_id, message_id, "Gemini Models",user_id)
+        elif call.data =='save_gemini-exp-1206' :
+            change_chat_model(user_id,"gemini-exp-1206")
+            display_tool_info(chat_id, message_id, "Gemini Models",user_id)
+        elif call.data =='save_gemini-1.5-pro': #gemini-1.5-pro
+            change_chat_model(user_id,"gemini-1.5-pro")
+            display_tool_info(chat_id, message_id, "Gemini Models",user_id)
+        elif call.data =='save_gemini-1.5-flash':
+            change_chat_model(user_id,"gemini-1.5-flash")
+            display_tool_info(chat_id, message_id, "Gemini Models",user_id) 
+
+
+        elif call.data =='save_claude-3-5-sonnet-20241022':
+            change_chat_model(user_id,"claude-3-5-sonnet-20241022")
+            display_tool_info(chat_id, message_id, "Claude Models",user_id) 
+        elif call.data =='save_claude-3-5-haiku-20241022':
+            change_chat_model(user_id,"claude-3-5-haiku-20241022")
+            display_tool_info(chat_id, message_id, "Claude Models",user_id) 
+        elif call.data =='save_claude-3-haiku-20240307':
+            change_chat_model(user_id,"claude-3-haiku-20240307")
+            display_tool_info(chat_id, message_id, "Claude Models",user_id) 
+        elif call.data =='save_claude-3-opus-20240229':
+            change_chat_model(user_id,"claude-3-opus-20240229")
+            display_tool_info(chat_id, message_id, "Claude Models",user_id)
+        elif call.data =='save_claude-3-sonnet-20240229':
+            change_chat_model(user_id,"claude-3-sonnet-20240229")
+            display_tool_info(chat_id, message_id, "Claude Models",user_id) 
+        elif call.data =='save_claude-2.1':
+            change_chat_model(user_id,"claude-2.1")
+            display_tool_info(chat_id, message_id, "Claude Models",user_id) 
+        elif call.data =='save_claude-2.0':
+            change_chat_model(user_id,"claude-2.0")
+            display_tool_info(chat_id, message_id, "Claude Models",user_id) 
+
+
+        elif call.data =='save_llama':
+            change_chat_model(user_id,"llama")
+            display_tool_info(chat_id, message_id, "Select Model",user_id) 
+        elif call.data =='save_mistral':
+            change_chat_model(user_id,"mistral")
+            display_tool_info(chat_id, message_id, "Select Model",user_id) 
+        elif call.data =='save_cohere':
+            change_chat_model(user_id,"cohere")
+            display_tool_info(chat_id, message_id, "Select Model",user_id)
+
+        elif call.data =='save_llama-3.1-sonar-small-128k-online':
+            change_chat_model(user_id,"llama-3.1-sonar-small-128k-online")
+            display_tool_info(chat_id, message_id, "Perplexity Models",user_id)
+        elif call.data =='save_llama-3.1-sonar-large-128k-online':
+            change_chat_model(user_id,"llama-3.1-sonar-large-128k-online")
+            display_tool_info(chat_id, message_id, "Perplexity Models",user_id)
+        elif call.data =='save_llama-3.1-sonar-huge-128k-online':
+            change_chat_model(user_id,"llama-3.1-sonar-huge-128k-online")
+            display_tool_info(chat_id, message_id, "Perplexity Models",user_id)
+
+        elif call.data == "save_dall-e-3standard":
+            change_image_quality(user_id,"dalle3satndard")
+            display_tool_info(chat_id, message_id, "Generation Quality",user_id)
+        elif call.data == "save_dall-e-3hd":
+            change_image_quality(user_id,"dalle3hd")
+            display_tool_info(chat_id, message_id, "Generation Quality",user_id)
+
+
+    except ApiTelegramException as e:
+        if e.result_json['error_code'] == 400 and 'message is not modified' in e.result_json.get('description', ''):
+            # Log the error or simply ignore it as the message content has not been modified
+            return
+        else:
+            # If it's a different API error, log it or handle it
+            return
+
+
+# Function to send the welcome message and main menu
+def send_welcome(chat_id, message_id=None):
+    welcome_text = (
+        "🌟 <b>Welcome to the Cogify Bot!</b> 🌟\n\n"
+        "═════════════════\n"
+        "✨ <b>Explore the features using navigation buttons below:</b>  \n\n"
+        "🔧 <b>Some Features:</b>  \n\n"
+        "• 💳 <i>Free Access to ALL AI Models</i>\n"
+        "• 🔒 <i>Free Unlimited Image generation</i>\n\n"
+        "🌐 Web Version: <code><a>cogify.social</a></code>\n\n"
+        "💡 <i>Tip:</i> Use /help to show this message again.  \n\n"
+        "═════════════════\n"
+    )
+    
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("⚙️ Settings", callback_data='main_menu'),
+               InlineKeyboardButton("❌ Close", callback_data='close_help'))
+    if message_id:
+        bot.edit_message_text(welcome_text, chat_id=chat_id, message_id=message_id, reply_markup=markup,parse_mode="HTML")
+    else:
+        bot.send_message(chat_id, welcome_text, reply_markup=markup,parse_mode="HTML")
+
+# Function to display the main menu
+def display_main_menu(chat_id, message_id):
+
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton("🧠 Select Model", callback_data='select_model'))
+    markup.add(InlineKeyboardButton("🖼️ Generation Quality", callback_data='gen_quality'))
+    markup.add(InlineKeyboardButton("🔧  Custom System Prompt", callback_data='custom_prompt'))
+    markup.add(InlineKeyboardButton("🔙 Back", callback_data='back'),
+               InlineKeyboardButton("❌ Close", callback_data='close_help'))  # Added Back button below
+
+    bot.edit_message_text("🌟 Welcome to the Bot! 🌟\nUse the buttons below to navigate.\n\n🔧 Main Menu:\nChoose an option:", chat_id=chat_id, message_id=message_id, reply_markup=markup)
+    user_states[chat_id] = {"current": "main_menu", "previous": None}  # Set current state
+
+# Function to display tool information with a back button
+def display_tool_info(chat_id, message_id, tool_name,user_id):
+    chat_model = load_chat_model(user_id)
+    genquality = load_image_quality(user_id)
+    markup = InlineKeyboardMarkup()
+
+    # Dynamically set the previous state based on the current screen
+    if tool_name == "Select Model":
+        markup.add(InlineKeyboardButton("🤖 Open AI   ⭐4.9", callback_data='open_ai_models'))
+        markup.add(InlineKeyboardButton("🌟 Gemini   ⭐4.8", callback_data='gemini_models'))
+        markup.add(InlineKeyboardButton("🧠 Claude   ⭐4.7", callback_data="claude_models"))
+        markup.add(InlineKeyboardButton("🦙 Llama 3.3 70B   ⭐4.4", callback_data='save_llama'))
+        markup.add(InlineKeyboardButton("🌀 Mistral-Large-2411   ⭐4.2", callback_data="save_mistral"))
+        markup.add(InlineKeyboardButton("🤔 Perplexity   ⭐4.1", callback_data='perplexity_models'))
+        markup.add(InlineKeyboardButton("🎯 Cohere-Command R+   ⭐4.1", callback_data='save_cohere'))
+
+        response_text = f"🔍 Click On the Model You want to choose.!\n\nCurrent Model: {chat_model}"
+        previous_state = "main_menu"  # Coming from the main menu
+
+    elif tool_name == "Open AI Models":
+                                                                                  
+        markup.add(InlineKeyboardButton("o1-preview", callback_data='save_o1_preview'), #o1-preview
+                   InlineKeyboardButton("o1 Mini", callback_data='save_o1-mini'))  #o1-mini
+        
+        markup.add(InlineKeyboardButton("CHATGPT 4o Latest", callback_data='save_chatgpt_4o_latest'), #chatgpt-4o-latest
+                   InlineKeyboardButton("GPT 4", callback_data='save_gpt_4')) #gpt-4 
+        
+        markup.add(InlineKeyboardButton("GPT 4o", callback_data='save_gpt_4o'), #gpt-4o
+                   InlineKeyboardButton("GPT-4o Mini", callback_data='save_gpt_4o_mini')) #gpt-4o-mini
+        
+        markup.add(InlineKeyboardButton("GPT 4 Turbo", callback_data='save_gpt_4_turbo'), #gpt-4-turbo
+                   InlineKeyboardButton("GPT-3.5-Turbo", callback_data='save_gpt_35_turbo')) #gpt-3.5-turbo
+
+        response_text = f"🔍 Choose The Open AI Model To Use!\n\nCurrent Model: {chat_model}"
+        previous_state = "Select Model"  # Coming from "Select Model"
+
+    elif tool_name == "Gemini Models":
+        markup.add(InlineKeyboardButton("✨ Gemini-2.0-Flash (exp)", callback_data='save_gemini-2.0-flash-exp'))  #gemini-2.0-flash-exp
+        markup.add(InlineKeyboardButton("💡 Gemini-2.0-Flash-Thinking", callback_data='save_gemini-2.0-flash-thinking-exp-1219')) #gemini-2.0-flash-thinking-exp-1219
+        markup.add(InlineKeyboardButton("⚡ Gemini-Exp-1206", callback_data='save_gemini-exp-1206')) #gemini-exp-1206
+        markup.add(InlineKeyboardButton("✨ Gemini-1.5-Pro", callback_data='save_gemini-1.5-pro'))  #gemini-1.5-pro
+        markup.add(InlineKeyboardButton("⚡ Gemini-1.5-Flash", callback_data='save_gemini-1.5-flash'))  #gemini-1.5-flash
+
+        response_text = f"🔍 Choose The Gemini AI Model To Use!\n\nCurrent Model: {chat_model}"
+        previous_state = "Select Model"  # Coming from "Select Model"
+
+    elif tool_name == "Claude Models":
+        markup.add(InlineKeyboardButton("Claude 3.5 Sonnet", callback_data='save_claude-3-5-sonnet-20241022'))  #claude-3-5-sonnet-20241022
+        markup.add(InlineKeyboardButton("Claude 3.5 Haiku", callback_data='save_claude-3-5-haiku-20241022')) #claude-3-5-haiku-20241022
+        markup.add(InlineKeyboardButton("Claude 3 Haiku", callback_data='save_claude-3-haiku-20240307'))  #claude-3-haiku-20240307
+        markup.add(InlineKeyboardButton("Claude 3 Opus", callback_data='save_claude-3-opus-20240229'))  #claude-3-opus-20240229
+        markup.add(InlineKeyboardButton("Claude 3 Sonet", callback_data='save_claude-3-sonnet-20240229')) #claude-3-sonnet-20240229
+        markup.add(InlineKeyboardButton("Claude 2.1", callback_data='save_claude-2.1'))  #claude-2.1
+        markup.add(InlineKeyboardButton("Claude 2.0", callback_data='save_claude-2.0'))  #claude-2.0
+
+        response_text = f"🔍 Choose The Claude AI Model To Use!\n\nCurrent Model: {chat_model}"
+        previous_state = "Select Model"  # Coming from "Select Model"
+
+    elif tool_name == "Perplexity Models":
+        markup.add(InlineKeyboardButton("llama-3.1-sonar-small", callback_data='save_llama-3.1-sonar-small-128k-online'))  #llama-3.1-sonar-small-128k-online
+        markup.add(InlineKeyboardButton("llama-3.1-sonar-large", callback_data='save_llama-3.1-sonar-large-128k-online')) #llama-3.1-sonar-large-128k-online
+        markup.add(InlineKeyboardButton("llama-3.1-sonar-huge", callback_data='save_llama-3.1-sonar-huge-128k-online')) #llama-3.1-sonar-huge-128k-online
+
+        response_text = f"🔍 Choose The Perplexity AI Model To Use!\n\nCurrent Model: {chat_model}"
+        previous_state = "Select Model"  # Coming from "Select Model"
+
+
+    elif tool_name == "Generation Quality":
+        markup.add(InlineKeyboardButton("🎨 DALL-E-3 Standard", callback_data='save_dall-e-3standard'))
+        markup.add(InlineKeyboardButton("🖼️ DALL-E 3 HD", callback_data='save_dall-e-3hd'))
+
+        response_text = f"🔍 Choose The Image Generation Quality!\n\nCurrent Quality: {genquality}"
+        previous_state = "main_menu"  # Coming from the main menu
+
+
+    elif tool_name == "Custom System Prompt":
+        # markup.add(InlineKeyboardButton("Save your custom prompt using\n\n/custom <Your Prompt Here>\n\n/custom You are a helpful assistant.", callback_data='save_custom_prompt'))
+        response_text = "Save your custom prompt using\n\n /custom {Your Prompt Here} \n\n /custom You are a helpful assistant."
+        previous_state = "main_menu"  # Coming from the main menu
+
+    markup.add(InlineKeyboardButton("🔙 Back", callback_data='back'),
+               InlineKeyboardButton("❌ Close", callback_data='close_help'))  # Back button for tool info
+
+    bot.edit_message_text(response_text, chat_id=chat_id, message_id=message_id, reply_markup=markup, parse_mode="HTML")
+    
+    # Now set the previous state correctly based on which screen you're on
+    user_states[chat_id] = {"current": "tool_info", "previous": previous_state}  # Set current and previous state
+
+
+    
+    
+def refresh_selected_model_message(chat_id, message_id, markup):
+    # Retrieve the selected model from user states (or a database)
+    selected_model = "Chatgpt 3.5 turbo"
+
+    # Construct the new message text with the updated model
+    updated_message = f"🔍 Click On the Model You want to choose.!\n\nCurrent Model: {selected_model}\n\n"
+
+    # Update only the part of the message that shows the current model (keeping the buttons)
+    bot.edit_message_text(
+        updated_message,
+        chat_id=chat_id,
+        message_id=message_id,
+        reply_markup=markup,  # Keep the same keyboard
+        parse_mode="HTML"
     )
 
-
-dispatcher.add_handler(CommandHandler("clear", clear_history, run_async=True))
-dispatcher.add_handler(CommandHandler("start", start, run_async=True))
-dispatcher.add_handler(CommandHandler("img", generate_image, run_async=True))
-dispatcher.add_handler(CommandHandler("img1", generate_image, run_async=True))
-dispatcher.add_handler(CommandHandler("settings", settings))
-dispatcher.add_handler(
-    CallbackQueryHandler(
-        settings_callback,
-        pattern="^(generation_quality|system_prompt|default_model)$"))
-dispatcher.add_handler(
-    CallbackQueryHandler(generation_quality_callback,
-                         pattern="^(standard|hd|flux)$"))
-dispatcher.add_handler(
-    CallbackQueryHandler(default_model_callback,
-                         pattern="^(gpt-4o|llama-3.1-sonar-large-128k-online|llama-3.1-sonar-small-128k-online|mistral-large)$"))
-
-dispatcher.add_handler(
-    MessageHandler(Filters.text | Filters.photo, respond_to_message, run_async=True))
-
-# Start the bot with error handling
-while True:
-    try:
-        updater.start_polling()
-        updater.idle()
-    except Exception as e:
-        report_error(e)
-        # Restart the bot after a short delay
-        time.sleep(5)
+    
+bot.infinity_polling()
