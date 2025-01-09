@@ -11,6 +11,9 @@ import os
 from dotenv import load_dotenv, dotenv_values
 
 
+
+
+# Load environment variables from .env file
 load_dotenv()
 
 #For Llama

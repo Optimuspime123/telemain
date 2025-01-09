@@ -15,4 +15,4 @@ google-generativeai
 anthropic
 azure-ai-inference
 azure-core
-
+python-dotenv
