@@ -16,9 +16,7 @@ import requests
 from telebot.apihelper import ApiTelegramException
 from usersettingmanager import(load_chat_model,load_custom_system_prompt,load_image_quality,change_chat_model,change_custom_prompt,change_image_quality)
 from dotenv import load_dotenv, dotenv_values
-
-
-
+import base64
 
 # Load environment variables from .env file
 load_dotenv()
@@ -36,7 +34,7 @@ user_ids = []  # This should be populated based on your audience logic
 
 
 # Initialize the bot with your token
-TELEGRAM_BOT_TOKEN = os.getenv('BOT_TOKEN') #Test
+TELEGRAM_BOT_TOKEN = "6916506986:AAG6oz3eGfUqq_RXOawvJ1zDmyKp-Fi12Ag)" #Test
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 # Create a ThreadPoolExecutor with a limit on the number of concurrent threads
 executor = ThreadPoolExecutor(max_workers=40)  # Adjust the number of workers as needed
@@ -308,6 +306,12 @@ def img(message):
         user_lock.release()  # Ensure the lock is released after processing
 
 
+# Function to encode an image to base64
+def encode_image(image_path):
+    with open(image_path, 'rb') as image_file:
+        return base64.b64encode(image_file.read()).decode('utf-8')
+
+
 #Command Handler for /gpt4
 @bot.message_handler(func=lambda message: parse_command(message.text) == 'gpt4')
 def gpt4(message):
@@ -331,7 +335,7 @@ def gpt4(message):
 
         full_text = message.text
         rest_message = ""
-        
+        img_url = None
         # Handle reply message (when someone tags another person's message)
         if message.reply_to_message:
             if message.reply_to_message.text:
@@ -349,18 +353,42 @@ def gpt4(message):
                 # Assuming the file is a text file, decode it
                 file_content = file.decode('utf-8')
                 rest_message = f"{file_content}\n{full_text[len('/gpt4 '):].strip()}"
+            elif message.reply_to_message.photo:
+                file_id = message.reply_to_message.photo[-1].file_id
+                newFile = bot.get_file(file_id)
+                newFile.download('temp_image.jpg')
+
+                # Encode the image to base64
+                base64_image = encode_image('temp_image.jpg')
+                img_url = f"data:image/jpeg;base64,{base64_image}"
+                os.remove('temp_image.jpg')
+
+        if message.photo:
+            #Handle the case when user directly sends photo
+            file_id = message.photo[-1].file_id
+            newFile = bot.get_file(file_id)
+            newFile.download('temp_image.jpg')
+            base64_image = encode_image('temp_image.jpg')
+            img_url = f"data:image/jpeg;base64,{base64_image}"
+            os.remove('temp_image.jpg')
 
         user_message = full_text
         rest_message += user_message
 
+        if img_url:
+            prompt = f"User has uploaded this image:{message.caption if message.caption else ''}"
+        else:
+            prompt = rest_message
+            
+
         # Combine conversation context with the rest of the message
-        prompt = rest_message
+      
         typing_message = bot.send_message(message.chat.id, "Typing...")
 
         stop_event = Event()  # Create an event to control the typing animation
         animation_thread = Thread(target=typing_animation, args=(message.chat.id, typing_message.message_id, stop_event))
         animation_thread.start()
-        response = test_openai_key(user_id,prompt)  # Send the prompt to GPT-4
+        response = test_openai_key(user_id,prompt,img_url)  # Send the prompt to GPT-4
         stop_event.set()  # Signal the animation to stop
         animation_thread.join()  # Wait for the thread to finish
 
@@ -430,11 +458,14 @@ def start(message):
     send_welcome(message.chat.id)
     
     
-@bot.message_handler(func=lambda m: True)
-def process_message(message):
-    # Start handling messages in a separate thread
-    executor.submit(gpt4, message)
+# @bot.message_handler(func=lambda m: True)
+# def process_message(message):
+#     # Start handling messages in a separate thread
+#     executor.submit(gpt4, message)
 
+@bot.message_handler(content_types=['text','photo','document'])
+def handle_all_messages(message):
+     executor.submit(gpt4, message)
 
 # Callback query handler
 @bot.callback_query_handler(func=lambda call: True)
@@ -588,7 +619,6 @@ def callback_query(call):
         else:
             # If it's a different API error, log it or handle it
             return
-
 
 # Function to send the welcome message and main menu
 def send_welcome(chat_id, message_id=None):
