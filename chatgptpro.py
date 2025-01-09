@@ -11,8 +11,6 @@ import os
 from dotenv import load_dotenv, dotenv_values
 
 
-
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -96,7 +94,7 @@ def get_or_create_session_llama(user_id):
         user_sessions_llama[user_id] = []
     return user_sessions_llama[user_id]
 
-def test_openai_key(user_id, prompt):
+def test_openai_key(user_id, prompt, img_url=None):
 
     model_chat = load_chat_model(user_id)
 
@@ -142,7 +140,16 @@ def test_openai_key(user_id, prompt):
                 openai_conversation_history.append({"role": "system", "content": customprompt})
             
             # Add user message to conversation history
-            openai_conversation_history.append({"role": "user", "content": prompt})
+            if img_url:
+                openai_conversation_history.append({
+                    "role": "user",
+                     "content": prompt,
+                    "type": "image_url",
+                    "image_url": img_url
+                     
+                })
+            else:
+                openai_conversation_history.append({"role": "user", "content": prompt})
 
             try:
                 # Use the chat completions method with the model "o1-preview-2024-09-12"
