@@ -87,6 +87,7 @@ def register_message(message):
     busy_message_info = (busy_message.chat.id, busy_message.message_id)
     threading.Timer(15, lambda: bot.delete_message(busy_message_info[0], busy_message_info[1]) if busy_message_info else None).start()
 
+
 # Command handler for /start
 
 # Command handler for /start
