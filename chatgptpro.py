@@ -149,7 +149,7 @@ def test_openai_key(user_id, prompt, img_url=None):
                      
                 })
             else:
-                openai_conversation_history.append({"role": "user", "content": prompt})
+                openai_conversation_history.append({"role": "user", "type": "text", "content": prompt})
 
             try:
                 # Use the chat completions method with the model "o1-preview-2024-09-12"
