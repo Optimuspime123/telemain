@@ -15,6 +15,14 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 from telebot.apihelper import ApiTelegramException
 from usersettingmanager import(load_chat_model,load_custom_system_prompt,load_image_quality,change_chat_model,change_custom_prompt,change_image_quality)
+from dotenv import load_dotenv, dotenv_values
+
+
+
+
+# Load environment variables from .env file
+load_dotenv()
+
 
 catmaxfuryuserid = 6975177248
 USER_DATA_FILE = 'user_data.json'
@@ -28,7 +36,7 @@ user_ids = []  # This should be populated based on your audience logic
 
 
 # Initialize the bot with your token
-TELEGRAM_BOT_TOKEN = '7021728236:AAFz9JMyEYihmesN70RCg7bQBmVIF3jPnTA' #Test
+TELEGRAM_BOT_TOKEN = os.getenv('BOT_TOKEN') #Test
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 # Create a ThreadPoolExecutor with a limit on the number of concurrent threads
 executor = ThreadPoolExecutor(max_workers=40)  # Adjust the number of workers as needed
