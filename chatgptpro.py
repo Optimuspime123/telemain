@@ -40,6 +40,7 @@ claude = anthropic.Anthropic(
     api_key=os.getenv('ANTHROPIC_API_KEY'),
 )
 
+
 # Your OpenAI API key (ensure this is set securely, preferably as an environment variable)
 genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))    # Gemini API key
 
