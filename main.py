@@ -34,7 +34,7 @@ user_ids = []  # This should be populated based on your audience logic
 
 
 # Initialize the bot with your token
-TELEGRAM_BOT_TOKEN = "6916506986:AAG6oz3eGfUqq_RXOawvJ1zDmyKp-Fi12Ag)" #Test
+TELEGRAM_BOT_TOKEN = os.getenv("BOT_TOKEN") #Test
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 # Create a ThreadPoolExecutor with a limit on the number of concurrent threads
 executor = ThreadPoolExecutor(max_workers=40)  # Adjust the number of workers as needed
@@ -315,7 +315,7 @@ def encode_image(image_path):
 #Command Handler for /gpt4
 @bot.message_handler(func=lambda message: parse_command(message.text) == 'gpt4')
 def gpt4(message):
-
+    
     user_id = message.from_user.id
     user_data = check_user(user_id)
 
@@ -334,8 +334,8 @@ def gpt4(message):
             return
 
         full_text = message.text
+        #print(message)
         rest_message = ""
-        img_url = None
         # Handle reply message (when someone tags another person's message)
         if message.reply_to_message:
             if message.reply_to_message.text:
@@ -353,35 +353,23 @@ def gpt4(message):
                 # Assuming the file is a text file, decode it
                 file_content = file.decode('utf-8')
                 rest_message = f"{file_content}\n{full_text[len('/gpt4 '):].strip()}"
-            elif message.reply_to_message.photo:
-                file_id = message.reply_to_message.photo[-1].file_id
-                newFile = bot.get_file(file_id)
-                newFile.download('temp_image.jpg')
-
-                # Encode the image to base64
-                base64_image = encode_image('temp_image.jpg')
-                img_url = f"data:image/jpeg;base64,{base64_image}"
-                os.remove('temp_image.jpg')
-
+        img_url = None
         if message.photo:
             #Handle the case when user directly sends photo
-            file_id = message.photo[-1].file_id
+            file_id = message.photo[0].file_id
             newFile = bot.get_file(file_id)
-            newFile.download('temp_image.jpg')
+            downloaded_file = bot.download_file(newFile.file_path)
+            with open("temp_image.jpg", 'wb') as new_file:
+                        new_file.write(downloaded_file)            
             base64_image = encode_image('temp_image.jpg')
             img_url = f"data:image/jpeg;base64,{base64_image}"
             os.remove('temp_image.jpg')
 
         user_message = full_text
-        rest_message += user_message
-
-        if img_url:
-            prompt = f"User has uploaded this image:{message.caption if message.caption else ''}"
+        if img_url and img_url.strip():
+            prompt = f"User has added an image to the conversation:{message.caption if message.caption else ''}"
         else:
-            prompt = rest_message
-            
-
-        # Combine conversation context with the rest of the message
+            prompt = user_message
       
         typing_message = bot.send_message(message.chat.id, "Typing...")
 
@@ -405,7 +393,7 @@ def gpt4(message):
             os.remove('response.txt')  # Delete the file after sending
         else:
             # Send the response as a normal text message
-            bot.edit_message_text(response, message.chat.id, typing_message.message_id, parse_mode='Markdown')
+            bot.edit_message_text(response, message.chat.id, typing_message.message_id)
 
     except Exception as e:
         stop_event.set()  # Signal the animation to stop
