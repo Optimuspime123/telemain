@@ -11,8 +11,6 @@ import os
 from dotenv import load_dotenv, dotenv_values
 
 
-
-
 # Load environment variables from .env file
 load_dotenv()
 
@@ -96,13 +94,13 @@ def get_or_create_session_llama(user_id):
         user_sessions_llama[user_id] = []
     return user_sessions_llama[user_id]
 
-def test_openai_key(user_id, prompt):
+def test_openai_key(user_id, prompt, img_url=None):
 
     model_chat = load_chat_model(user_id)
 
     customprompt = load_custom_system_prompt(user_id)
     if not customprompt:
-        customprompt =  "You are Cogify, an advanced Telegram AI bot built to help users. You can process text (and image inputs using the GPT-4o model), and can generate images using DALL-E3 - command is /img {prompt}. Be friendly and helpful!  to clear conversation history user should send /clear. To choose settings and change AI Model used they can send /settings . To get results from the internet they can use /web {query}"
+        customprompt =  "You are Cogify, an advanced Telegram AI bot built to help users. You can process text (and image inputs using the GPT-4o model), and can generate images using DALL-E3 - command is /img {prompt}. Be friendly and helpful!  to clear conversation history user should send /clear. To choose settings and change AI Model used they can send /help or /settings ."
     chatgptmodels = {"o1-preview","o1-mini","chatgpt-4o-latest","gpt-4","gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo"}
     geminimodels = {"gemini-2.0-flash-exp","gemini-2.0-flash-thinking-exp-1219","gemini-exp-1206","gemini-1.5-pro","gemini-1.5-flash"}
     claudemodels = {"claude-3-5-sonnet-20241022","claude-3-5-haiku-20241022","claude-3-haiku-20240307","claude-3-opus-20240229","claude-3-sonnet-20240229","claude-2.1","claude-2.0"}
@@ -142,7 +140,26 @@ def test_openai_key(user_id, prompt):
                 openai_conversation_history.append({"role": "system", "content": customprompt})
             
             # Add user message to conversation history
-            openai_conversation_history.append({"role": "user", "content": prompt})
+            if img_url:
+                openai_conversation_history.append({
+                    "role": "user",
+                     "content": [
+                {
+                    "type": "text",
+                    "text": prompt,
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {
+                "url": img_url,
+            },
+                },
+            ],
+                     
+                })
+                
+            else:
+                openai_conversation_history.append({"role": "user", "type": "text", "content": prompt})
 
             try:
                 # Use the chat completions method with the model "o1-preview-2024-09-12"
