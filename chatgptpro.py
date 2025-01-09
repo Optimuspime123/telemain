@@ -7,6 +7,11 @@ from azure.core.credentials import AzureKeyCredential
 from azure.core.exceptions import HttpResponseError
 from azure.ai.inference.models import AssistantMessage, UserMessage, SystemMessage
 import anthropic
+import os
+from dotenv import load_dotenv, dotenv_values
+
+
+load_dotenv()
 
 #For Llama
 llama = ChatCompletionsClient(
@@ -29,7 +34,7 @@ mistral = ChatCompletionsClient(
 #For Claude 
 claude = anthropic.Anthropic(
     # defaults to os.environ.get("ANTHROPIC_API_KEY")
-    api_key="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",
+    api_key=os.getenv('ANTHROPIC_API_KEY'),
 )
 
 # Your OpenAI API key (ensure this is set securely, preferably as an environment variable)
