@@ -18,20 +18,20 @@ load_dotenv()
 
 #For Llama
 llama = ChatCompletionsClient(
-    endpoint= "https://Llama-3-3-70B.swedencentral.models.ai.azure.com/",
-    credential=AzureKeyCredential("R1Fci4DpIPTL3bReshbEgnkmvbHjEPD4"),
+    endpoint= os.getenv('LLAMA_ENDPOINT'),
+    credential=AzureKeyCredential(os.getenv('LLAMA_KEY')),
 )
 
 #FOR Cohere
 cohere = ChatCompletionsClient(
-    endpoint= "https://Cohere-r-plus-08-2024.swedencentral.models.ai.azure.com/",
-    credential=AzureKeyCredential("IgQZzt5GW5O2oUQtwV9efHKRCxDKYMfy"),
+    endpoint= os.getenv('COHERE_ENDPOINT'),
+    credential=AzureKeyCredential(os.getenv('COHERE_KEY')),
 )
 
 #For Mistral AI
 mistral = ChatCompletionsClient(
-    endpoint= "https://Mistral-Large-2411-sweden.swedencentral.models.ai.azure.com",
-    credential=AzureKeyCredential("JdInscIRN59NxFb7H9mgV7kaL6MRDvtd"),
+    endpoint= os.getenv('MISTRAL_ENDPOINT'),
+    credential=AzureKeyCredential(os.getenv('MISTRAL_KEY')),
 )
 
 #For Claude 
@@ -41,13 +41,12 @@ claude = anthropic.Anthropic(
 )
 
 # Your OpenAI API key (ensure this is set securely, preferably as an environment variable)
-api_key = "sk-proj-aL4MS273WXSk6rfW59d5T3BlbkFJixuAercJ3zg3cDyj8G1U"  # OpenAI API key
-genai.configure(api_key="AIzaSyDtNobcexPGjmJ-S9_j4BtUnuITAO6-Erw")    # Gemini API key
+genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))    # Gemini API key
 
-perplexity_api = "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"
+perplexity_api = os.getenv('PERPEXILITY_API_KEY')
 
 
-openai.api_key = api_key
+openai.api_key = os.getenv('OPENAI_API_KEY')
 
 model_image = "dall-e-3"  # For image generation (DALL·E)
 model_speech = "whisper-1"  # For speech-to-text (Whisper)
