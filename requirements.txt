@@ -16,4 +16,3 @@ anthropic
 azure-ai-inference
 azure-core
 
-dotenv
