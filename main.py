@@ -355,12 +355,25 @@ def gpt4(message):
                 rest_message = f"{file_content}\n{full_text[len('/gpt4 '):].strip()}"
         img_url = None
         if message.photo:
-            #Handle the case when user directly sends photo
+    # Get supported model list
+            supported_models = ["chatgpt-4o-latest", "gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+    
+    # Check current model
+            model_chat = load_chat_model(user_id)
+    
+    # Switch model if needed
+            if model_chat not in supported_models:
+                bot.send_message(message.chat.id, "You have been switched to OpenAI's latest gpt-4o model as your current one does not support multimodal conversations (ie chatting with images)")
+                change_chat_model(user_id, "chatgpt-4o-latest")
+    
+    # Process image
             file_id = message.photo[0].file_id
             newFile = bot.get_file(file_id)
             downloaded_file = bot.download_file(newFile.file_path)
+    
             with open("temp_image.jpg", 'wb') as new_file:
-                        new_file.write(downloaded_file)            
+                    new_file.write(downloaded_file)
+    
             base64_image = encode_image('temp_image.jpg')
             img_url = f"data:image/jpeg;base64,{base64_image}"
             os.remove('temp_image.jpg')
