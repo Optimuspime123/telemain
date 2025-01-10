@@ -39,7 +39,7 @@ bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 # Create a ThreadPoolExecutor with a limit on the number of concurrent threads
 executor = ThreadPoolExecutor(max_workers=40)  # Adjust the number of workers as needed
 lock = threading.Lock()
-
+STABILITY_API_KEY=os.getenv('STABILITY_API_KEY')
 def parse_command(text):
     """Parse the command from the message text, supporting both / and . prefixes."""
     if text.startswith('/') or text.startswith('.'):
@@ -261,7 +261,7 @@ def img(message):
             return
         
         # Extract the prompt for the image from the user's message
-        prompt = message.text[len("/img "):].strip()  # Remove '/image ' from the start of the message
+        prompt = message.text[len("/img "):].strip()
 
         # If no prompt is provided, inform the user
         if not prompt:
@@ -271,34 +271,57 @@ def img(message):
         # Notify the user that the image generation is in progress
         waiting_message = bot.send_message(message.chat.id, "Generating image...")
         gen_model = load_image_quality(user_id)
+        
         # Start the typing animation in the background
         stop_event = threading.Event()
         animation_thread = threading.Thread(target=gen_animation, args=(message.chat.id, waiting_message.message_id, stop_event))
         animation_thread.start()
-        # Generate the image using the prompt
-        image_url = generate_image(user_id,prompt)
 
-        # bot.send_photo(message.chat.id,photo=image_url,caption=prompt)
-
-        # Stop the animation once the image is ready
-        stop_event.set()
-        
-
-        # If there is an error in the image generation
-        if "error" in image_url:
-            bot.send_message(message.chat.id, f"Error: {image_url}")
-        else:
-                # Download the image from the URL
-            image_data = download_image(image_url)
-            if image_data:
-
-                # Send the image back to the user
-                bot.send_photo(message.chat.id, image_data)
+        try:
+            if gen_model == "sd3":
+                # Handle SD3 image generation
+                response = requests.post(
+                    "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+                    headers={
+                        "authorization": f"Bearer {STABILITY_API_KEY}",
+                        "accept": "image/*"
+                    },
+                    files={"none": ''},
+                    data={
+                        "prompt": prompt,
+                        "output_format": "png",
+                    }
+                )
+                
+                if response.status_code == 200:
+                    # Send the image directly from the response content
+                    bot.send_photo(message.chat.id, response.content, caption=prompt)
+                else:
+                    bot.send_message(
+                        message.chat.id, 
+                        f"Error generating image: Status code {response.status_code}"
+                    )
             else:
-                bot.send_message(message.chat.id, f"Failed to download the image. Here is the URL: {image_url}")
+                # Use existing image generation logic
+                image_url = generate_image(user_id, prompt)
+                
+                if "error" in image_url:
+                    bot.send_message(message.chat.id, f"Error: {image_url}")
+                else:
+                    image_data = download_image(image_url)
+                    if image_data:
+                        bot.send_photo(message.chat.id, image_data)
+                    else:
+                        bot.send_message(
+                            message.chat.id, 
+                            f"Failed to download the image. Here is the URL: {image_url}"
+                        )
 
-        # Delete the waiting message
-        bot.delete_message(message.chat.id, waiting_message.message_id)
+        finally:
+            # Stop the animation once the image is ready or if there's an error
+            stop_event.set()
+            # Delete the waiting message
+            bot.delete_message(message.chat.id, waiting_message.message_id)
 
     except Exception as e:
         bot.reply_to(message, f"An error occurred: {e}")
@@ -611,6 +634,9 @@ def callback_query(call):
         elif call.data == "save_dall-e-3hd":
             change_image_quality(user_id,"dalle3hd")
             display_tool_info(chat_id, message_id, "Generation Quality",user_id)
+        elif call.data == "save_sd3":
+            change_image_quality(user_id,"sd3")
+            display_tool_info(chat_id, message_id, "Generation Quality",user_id)    
 
 
     except ApiTelegramException as e:
@@ -723,11 +749,12 @@ def display_tool_info(chat_id, message_id, tool_name,user_id):
         previous_state = "Select Model"  # Coming from "Select Model"
 
 
-    elif tool_name == "Generation Quality":
+    elif tool_name == "Generation Model":
         markup.add(InlineKeyboardButton("🎨 DALL-E-3 Standard", callback_data='save_dall-e-3standard'))
         markup.add(InlineKeyboardButton("🖼️ DALL-E 3 HD", callback_data='save_dall-e-3hd'))
+        markup.add(InlineKeyboardButton("✨ Stable Diffusion 3 (Large)", callback_data='save_sd3'))
 
-        response_text = f"🔍 Choose The Image Generation Quality!\n\nCurrent Quality: {genquality}"
+        response_text = f"🔍 Choose The Image Generation Model!\n\nCurrent Model: {genquality}"
         previous_state = "main_menu"  # Coming from the main menu
 
 
