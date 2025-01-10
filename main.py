@@ -749,7 +749,7 @@ def display_tool_info(chat_id, message_id, tool_name,user_id):
         previous_state = "Select Model"  # Coming from "Select Model"
 
 
-    elif tool_name == "Generation Model":
+    elif tool_name == "Generation Quality":
         markup.add(InlineKeyboardButton("🎨 DALL-E-3 Standard", callback_data='save_dall-e-3standard'))
         markup.add(InlineKeyboardButton("🖼️ DALL-E 3 HD", callback_data='save_dall-e-3hd'))
         markup.add(InlineKeyboardButton("✨ Stable Diffusion 3 (Large)", callback_data='save_sd3'))
