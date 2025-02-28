@@ -101,14 +101,14 @@ def test_openai_key(user_id, prompt, img_url=None):
     customprompt = load_custom_system_prompt(user_id)
     if not customprompt:
         customprompt =  "You are Cogify, an advanced Telegram AI bot built to help users. You can process text (and image inputs using the GPT-4o model), and can generate images using DALL-E3 - command is /img {prompt}. Be friendly and helpful!  to clear conversation history user should send /clear. To choose settings and change AI Model used they can send /help or /settings ."
-    chatgptmodels = {"o1-preview","o1-mini","chatgpt-4o-latest","gpt-4","gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo"}
+    chatgptmodels = {"o3-mini","o1-preview","o1-mini","chatgpt-4o-latest","gpt-4.5-preview","gpt-4","gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo"}
     geminimodels = {"gemini-2.0-flash-exp","gemini-2.0-flash-thinking-exp-1219","gemini-exp-1206","gemini-1.5-pro","gemini-1.5-flash"}
     claudemodels = {"claude-3-5-sonnet-20241022","claude-3-5-haiku-20241022","claude-3-haiku-20240307","claude-3-opus-20240229","claude-3-sonnet-20240229","claude-2.1","claude-2.0"}
     perplexitymodels = {"llama-3.1-sonar-small-128k-online","llama-3.1-sonar-large-128k-online","llama-3.1-sonar-huge-128k-online"}
 
     if model_chat in chatgptmodels:
 
-        if model_chat == "o1-preview" or model_chat == "o1-mini": #Doesnt Supports Custom Prompt
+        if model_chat in ["o1-preview", "o1-mini", "o3-mini"]: #Doesnt Supports Custom Prompt
             # Get or create the user's conversation history
             openai_conversation_history = get_or_create_sessionadvanceopenai(user_id)
             # Add user message to conversation history
