@@ -548,9 +548,15 @@ def callback_query(call):
         elif call.data == 'save_o1-mini': #o1 Mini
             change_chat_model(user_id,"o1-mini")
             display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_o3-mini': #o3 Mini
+            change_chat_model(user_id,"o3-mini")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)    
         elif call.data == 'save_chatgpt_4o_latest': #CHATGPT 4o Latest  #'save_chatgpt_4o_latest'), #chatgpt-4o-latest
             change_chat_model(user_id,"chatgpt-4o-latest") 
             display_tool_info(chat_id, message_id, "Open AI Models",user_id)
+        elif call.data == 'save_gpt-4-5': #4.5 gpt
+            change_chat_model(user_id,"gpt-4.5-preview")
+            display_tool_info(chat_id, message_id, "Open AI Models",user_id)    
         elif call.data == 'save_gpt_4': #GPT-4
             change_chat_model(user_id,"gpt-4")
             display_tool_info(chat_id, message_id, "Open AI Models",user_id)
@@ -705,6 +711,8 @@ def display_tool_info(chat_id, message_id, tool_name,user_id):
                                                                                   
         markup.add(InlineKeyboardButton("o1-preview", callback_data='save_o1_preview'), #o1-preview
                    InlineKeyboardButton("o1 Mini", callback_data='save_o1-mini'))  #o1-mini
+        markup.add(InlineKeyboardButton("o3-mini", callback_data='save_o3_mini'), #o3
+                   InlineKeyboardButton("GPT 4.5 preview", callback_data='save_gpt-4-5'))  #4.5 
         
         markup.add(InlineKeyboardButton("CHATGPT 4o Latest", callback_data='save_chatgpt_4o_latest'), #chatgpt-4o-latest
                    InlineKeyboardButton("GPT 4", callback_data='save_gpt_4')) #gpt-4 
